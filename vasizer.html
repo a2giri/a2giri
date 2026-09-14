@@ -1,0 +1,2080 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web VOCALOID Studio (.vao Supported)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter & Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .font-logo {
+            font-family: 'Outfit', sans-serif;
+        }
+        /* Custom styled scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .shadow-glow {
+            box-shadow: 0 0 20px -3px rgba(6, 182, 212, 0.25);
+        }
+        .shadow-soft {
+            box-shadow: 0 10px 25px -5px rgba(148, 163, 184, 0.15), 0 8px 10px -6px rgba(148, 163, 184, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-sky-50/60 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-white/90 backdrop-blur-md border-b border-sky-100 px-3 md:px-5 py-2.5 flex items-center justify-between shadow-sm z-30 shrink-0">
+        <!-- Brand & Mobile Sidebar Toggle -->
+        <div class="flex items-center gap-3">
+            <button id="btn-toggle-sidebar" class="lg:hidden p-2 text-slate-600 hover:text-cyan-600 hover:bg-sky-100/50 rounded-xl transition">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2.5">
+                <div class="bg-gradient-to-tr from-cyan-500 to-sky-400 p-2 rounded-xl text-white font-bold flex items-center justify-center shadow-md shadow-cyan-500/20">
+                    <i class="fa-solid fa-music text-base"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="font-logo font-extrabold tracking-wider bg-gradient-to-r from-cyan-600 to-sky-500 bg-clip-text text-transparent text-base md:text-lg leading-none">VOCALOID STUDIO</span>
+                    <span class="text-[10px] font-medium text-sky-600/70 tracking-widest uppercase">Pocket Edition + VAO Engine</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls / Playback -->
+        <div class="flex items-center gap-2 md:gap-3">
+            <button id="btn-play" class="bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-white font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 shadow-md shadow-cyan-500/20 active:scale-95 text-xs md:text-sm">
+                <i class="fa-solid fa-play"></i> <span class="hidden sm:inline">再生</span>
+            </button>
+            <button id="btn-stop" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm">
+                <i class="fa-solid fa-square text-xs text-slate-500"></i> <span class="hidden sm:inline">停止</span>
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 mx-0.5 md:mx-1"></div>
+
+            <!-- BPM Header Direct Input -->
+            <div class="flex items-center gap-1.5 bg-sky-50/80 border border-sky-100 px-2.5 py-1.5 rounded-xl shadow-xs">
+                <span class="text-xs font-bold text-sky-700 flex items-center gap-1"><i class="fa-solid fa-gauge-high text-cyan-600"></i> BPM</span>
+                <input id="header-bpm-input" type="number" min="40" max="240" value="120" class="w-14 bg-white border border-sky-200 rounded-lg px-1.5 py-0.5 text-xs font-mono font-bold text-cyan-900 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
+            </div>
+
+            <div class="h-6 w-px bg-slate-200 mx-0.5 md:mx-1"></div>
+
+            <!-- Project Open / Save -->
+            <input type="file" id="input-open-project" accept=".json" class="hidden">
+            <button id="btn-open-project" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm">
+                <i class="fa-solid fa-folder-open text-sky-600"></i> <span class="hidden md:inline">開く</span>
+            </button>
+            <button id="btn-save-project" class="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-medium px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm">
+                <i class="fa-solid fa-floppy-disk text-cyan-600"></i> <span class="hidden md:inline">保存</span>
+            </button>
+
+            <!-- Dynamic Measure Expansion Button -->
+            <button id="btn-add-measures" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium px-2.5 py-2 rounded-xl transition flex items-center gap-1 active:scale-95 text-xs md:text-sm" title="+8小節追加">
+                <i class="fa-solid fa-plus text-emerald-600"></i> <span class="hidden sm:inline">小節</span>
+                <span id="bar-count-badge" class="ml-1 bg-emerald-200/80 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold">16小節</span>
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 mx-0.5 md:mx-1"></div>
+
+            <!-- Copy / Paste / Select All Controls -->
+            <button id="btn-copy" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2.5 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm" title="コピー (Ctrl+C)">
+                <i class="fa-solid fa-copy text-indigo-500"></i> <span class="hidden lg:inline">コピー</span>
+            </button>
+            <button id="btn-paste" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2.5 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm" title="貼り付け (Ctrl+V)">
+                <i class="fa-solid fa-paste text-purple-500"></i> <span class="hidden lg:inline">貼り付け</span>
+            </button>
+            <button id="btn-select-all" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2.5 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm" title="全選択 (Ctrl+A)">
+                <i class="fa-solid fa-object-group text-sky-500"></i> <span class="hidden lg:inline">全選択</span>
+            </button>
+
+            <!-- Export Audio -->
+            <button id="btn-export-wav" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-medium px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm">
+                <i class="fa-solid fa-download"></i> <span class="hidden md:inline">WAV保存</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Mobile Sidebar Overlay Backdrop -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-slate-900/30 backdrop-blur-xs z-30 hidden lg:hidden"></div>
+
+        <!-- Sidebar / Voice Settings Panel -->
+        <aside id="sidebar" class="fixed lg:relative top-0 left-0 h-full w-80 bg-white/95 border-r border-sky-100 flex flex-col z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out shadow-xl lg:shadow-none shrink-0">
+            <div class="p-4 border-b border-sky-100 flex items-center justify-between">
+                <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-cyan-500"></i> ボイスパラメータ
+                </h2>
+                <span id="voicebank-status" class="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-notch fa-spin text-cyan-500"></i> 音源ロード中...
+                </span>
+            </div>
+
+            <div class="p-4 space-y-5 overflow-y-auto flex-1 text-xs md:text-sm">
+                <!-- Singer Mode Selection -->
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1.5">シンガーモード</label>
+                    <select id="singer-mode" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium text-slate-800 focus:ring-2 focus:ring-cyan-400 focus:outline-none">
+                        <option value="formant">Cyber Singer (フォルマント合成)</option>
+                        <option value="neko">Neko Voicebank (サンプル音源)</option>
+                    </select>
+                </div>
+
+                <!-- .vao Voicebank Loader Panel -->
+                <div class="bg-gradient-to-br from-indigo-50/80 to-purple-50/80 p-3 rounded-xl border border-indigo-100 space-y-2 shadow-xs">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-indigo-900 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-audio text-indigo-600"></i> .vao ボイスバンク追加
+                        </label>
+                        <span id="vao-status-badge" class="text-[10px] text-indigo-500 font-medium">未追加</span>
+                    </div>
+
+                    <!-- Local .vao File Input -->
+                    <input type="file" id="input-vao-file" accept=".vao,.txt" class="hidden">
+                    <button id="btn-load-vao-file" class="w-full bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold py-1.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-xs active:scale-95">
+                        <i class="fa-solid fa-upload text-indigo-500"></i> .vao ファイルを開く
+                    </button>
+
+                    <!-- GitHub / Web URL Input -->
+                    <div class="space-y-1 pt-1">
+                        <span class="text-[10px] text-slate-500 font-medium block">GitHub または Web URLから読み込み:</span>
+                        <div class="flex gap-1.5">
+                            <input id="input-vao-url" type="url" placeholder="https://github.com/.../voice.vao" class="flex-1 bg-white border border-indigo-200 rounded-lg px-2 py-1 text-[11px] font-mono text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+                            <button id="btn-load-vao-url" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-2.5 py-1 rounded-lg text-xs transition shrink-0 active:scale-95">
+                                取得
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="vao-info-container" class="hidden text-[10px] bg-white/80 p-2 rounded-lg border border-indigo-100 text-slate-600 space-y-0.5">
+                        <div class="font-bold text-indigo-700 truncate" id="vao-loaded-name">---</div>
+                        <div id="vao-loaded-count" class="text-slate-500">音素数: 0</div>
+                    </div>
+                </div>
+
+                <!-- Backing Track / Audio Upload Section -->
+                <div class="bg-sky-50/80 p-3 rounded-xl border border-sky-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-slate-700 text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-compact-disc text-cyan-600"></i> 伴奏トラック (オーディオ)
+                        </label>
+                        <span id="audio-track-status" class="text-[10px] text-slate-400 font-medium">未読み込み</span>
+                    </div>
+                    <input type="file" id="input-audio-track" accept="audio/*" class="hidden">
+                    <button id="btn-load-audio" class="w-full bg-white hover:bg-sky-100 text-sky-700 border border-sky-200 font-semibold py-1.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-xs active:scale-95">
+                        <i class="fa-solid fa-file-audio text-cyan-500"></i> 音源ファイルを選択
+                    </button>
+                    <div id="audio-track-controls" class="hidden space-y-2 pt-1.5 border-t border-sky-200/60">
+                        <div class="text-[11px] font-semibold text-slate-700 truncate" id="audio-track-name">---</div>
+                        <div id="bpm-detect-container" class="flex items-center justify-between bg-white p-2 rounded-lg border border-sky-100 shadow-xs">
+                            <span class="text-[11px] font-medium text-slate-600">推定BPM: <strong id="detected-bpm-val" class="text-cyan-600 font-mono">解析中...</strong></span>
+                            <button id="btn-apply-bpm" class="hidden text-[10px] bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-600 hover:to-sky-600 text-white font-bold px-2 py-1 rounded-md transition shadow-xs active:scale-95">
+                                BPM適用
+                            </button>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-0.5">
+                                <span class="text-[11px] text-slate-600 font-medium">伴奏音量</span>
+                                <span id="val-audio-vol" class="font-mono text-[11px] font-semibold text-cyan-600">70%</span>
+                            </div>
+                            <input id="param-audio-vol" type="range" min="0" max="1" step="0.05" value="0.7" class="w-full accent-cyan-500 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Volume Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-medium text-slate-700">歌声音量 (Volume)</label>
+                        <span id="val-volume" class="font-mono font-semibold text-cyan-600">80%</span>
+                    </div>
+                    <input id="param-volume" type="range" min="0" max="1" step="0.05" value="0.8" class="w-full accent-cyan-500 cursor-pointer">
+                </div>
+
+                <!-- Vibrato Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-medium text-slate-700">ビブラート (Vibrato)</label>
+                        <span id="val-vibrato" class="font-mono font-semibold text-cyan-600">15%</span>
+                    </div>
+                    <input id="param-vibrato" type="range" min="0" max="0.5" step="0.05" value="0.15" class="w-full accent-cyan-500 cursor-pointer">
+                </div>
+
+                <!-- Reverb Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-medium text-slate-700">リバーブ (Reverb)</label>
+                        <span id="val-reverb" class="font-mono font-semibold text-cyan-600">30%</span>
+                    </div>
+                    <input id="param-reverb" type="range" min="0" max="0.8" step="0.05" value="0.3" class="w-full accent-cyan-500 cursor-pointer">
+                </div>
+
+                <!-- BPM Slider -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="font-medium text-slate-700">テンポ (BPM)</label>
+                        <span id="val-bpm" class="font-mono font-semibold text-cyan-600">120</span>
+                    </div>
+                    <input id="param-bpm" type="range" min="60" max="200" step="1" value="120" class="w-full accent-cyan-500 cursor-pointer">
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden relative bg-white">
+            <div id="editor-container" class="flex-1 flex overflow-hidden">
+                <!-- Piano Keys Column (Fixed Left) -->
+                <div class="w-12 md:w-16 flex flex-col bg-slate-100 border-r border-sky-100 shrink-0 z-10 pt-8" id="piano-keys"></div>
+
+                <!-- Scrollable Grid Container -->
+                <div id="grid-scroll-wrapper" class="flex-1 overflow-auto relative">
+                    <!-- Timeline Ruler -->
+                    <div class="sticky top-0 z-20 bg-white border-b border-sky-200">
+                        <canvas id="ruler-canvas" class="block cursor-pointer"></canvas>
+                    </div>
+                    <!-- Note Grid Canvas -->
+                    <canvas id="grid-canvas" class="block cursor-crosshair"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="note-modal" class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-sky-200 p-3 md:p-4 shadow-2xl z-40 transform translate-y-full transition-transform duration-200 ease-out hidden">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <span id="note-info-label" class="text-xs md:text-sm font-bold text-sky-800 bg-sky-100 px-2.5 py-1 rounded-lg">ノートプロパティ</span>
+            </div>
+
+            <!-- Lyric Input -->
+            <div class="flex-1 max-w-xs flex items-center gap-2">
+                <span class="text-xs font-semibold text-slate-600 shrink-0">歌詞:</span>
+                <input id="modal-lyric-input" type="text" maxlength="4" class="w-full bg-slate-50 border border-sky-200 rounded-xl px-3 py-1.5 text-sm font-bold text-cyan-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center">
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-1.5">
+                <button id="modal-move-btn" class="bg-amber-50 hover:bg-amber-100 text-amber-600 font-semibold px-2.5 py-1.5 rounded-xl text-xs transition border border-amber-200 flex items-center gap-1">
+                    <i class="fa-solid fa-arrows-up-down-left-right"></i> <span id="modal-move-text" class="hidden sm:inline">移動</span>
+                </button>
+                <button id="modal-delete-btn" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2.5 py-1.5 rounded-xl text-xs transition border border-red-200 flex items-center gap-1">
+                    <i class="fa-solid fa-trash-can"></i> <span class="hidden sm:inline">削除</span>
+                </button>
+                <button id="modal-close" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-sky-50 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Kana to Phoneme map
+        const KANA_MAP = {
+            'あ': { c: '', v: 'あ' }, 'い': { c: '', v: 'い' }, 'う': { c: '', v: 'う' }, 'え': { c: '', v: 'え' }, 'お': { c: '', v: 'お' },
+            'か': { c: 'k', v: 'あ' }, 'き': { c: 'k', v: 'い' }, 'く': { c: 'k', v: 'う' }, 'け': { c: 'k', v: 'え' }, 'こ': { c: 'k', v: 'お' },
+            'さ': { c: 's', v: 'あ' }, 'し': { c: 's', v: 'い' }, 'す': { c: 's', v: 'う' }, 'せ': { c: 's', v: 'え' }, 'そ': { c: 's', v: 'お' },
+            'た': { c: 't', v: 'あ' }, 'ち': { c: 't', v: 'い' }, 'つ': { c: 't', v: 'う' }, 'て': { c: 't', v: 'え' }, 'と': { c: 't', v: 'お' },
+            'な': { c: 'n', v: 'あ' }, 'に': { c: 'n', v: 'い' }, 'ぬ': { c: 'n', v: 'う' }, 'ね': { c: 'n', v: 'え' }, 'の': { c: 'n', v: 'お' },
+            'は': { c: 'h', v: 'あ' }, 'ひ': { c: 'h', v: 'い' }, 'ふ': { c: 'h', v: 'う' }, 'へ': { c: 'h', v: 'え' }, 'ほ': { c: 'h', v: 'お' },
+            'ま': { c: 'm', v: 'あ' }, 'み': { c: 'm', v: 'い' }, 'む': { c: 'm', v: 'う' }, 'め': { c: 'm', v: 'え' }, 'も': { c: 'm', v: 'お' },
+            'や': { c: 'y', v: 'あ' }, 'ゆ': { c: 'y', v: 'う' }, 'よ': { c: 'y', v: 'お' },
+            'ら': { c: 'r', v: 'あ' }, 'り': { c: 'r', v: 'い' }, 'る': { c: 'r', v: 'う' }, 'れ': { c: 'r', v: 'え' }, 'ろ': { c: 'r', v: 'お' },
+            'わ': { c: 'w', v: 'あ' }, 'を': { c: 'w', v: 'お' }, 'ん': { c: 'n', v: 'ん' },
+            'が': { c: 'g', v: 'あ' }, 'ぎ': { c: 'g', v: 'い' }, 'ぐ': { c: 'g', v: 'う' }, 'げ': { c: 'g', v: 'え' }, 'ご': { c: 'g', v: 'お' },
+            'ざ': { c: 'z', v: 'あ' }, 'じ': { c: 'z', v: 'い' }, 'ず': { c: 'z', v: 'う' }, 'ぜ': { c: 'z', v: 'え' }, 'ぞ': { c: 'z', v: 'お' },
+            'だ': { c: 'd', v: 'あ' }, 'ぢ': { c: 'd', v: 'い' }, 'づ': { c: 'd', v: 'う' }, 'で': { c: 'd', v: 'え' }, 'ど': { c: 'd', v: 'お' },
+            'ば': { c: 'b', v: 'あ' }, 'び': { c: 'b', v: 'い' }, 'ぶ': { c: 'b', v: 'う' }, 'べ': { c: 'b', v: 'え' }, 'ぼ': { c: 'b', v: 'お' },
+            'ぱ': { c: 'p', v: 'あ' }, 'ぴ': { c: 'p', v: 'い' }, 'ぷ': { c: 'p', v: 'う' }, 'ぺ': { c: 'p', v: 'え' }, 'ぽ': { c: 'p', v: 'お' },
+            'きゃ': { c: 'k', v: 'あ' }, 'きゅ': { c: 'k', v: 'う' }, 'きょ': { c: 'k', v: 'お' },
+            'しゃ': { c: 's', v: 'あ' }, 'しゅ': { c: 's', v: 'う' }, 'しょ': { c: 's', v: 'お' },
+            'ちゃ': { c: 't', v: 'あ' }, 'ちゅ': { c: 't', v: 'う' }, 'ちょ': { c: 't', v: 'お' },
+            'にゃ': { c: 'n', v: 'あ' }, 'にゅ': { c: 'n', v: 'う' }, 'にょ': { c: 'n', v: 'お' },
+            'ひゃ': { c: 'h', v: 'あ' }, 'ひゅ': { c: 'h', v: 'う' }, 'ひょ': { c: 'h', v: 'お' },
+            'みゃ': { c: 'm', v: 'あ' }, 'みゅ': { c: 'm', v: 'う' }, 'みょ': { c: 'm', v: 'お' },
+            'りゃ': { c: 'r', v: 'あ' }, 'りゅ': { c: 'r', v: 'う' }, 'りょ': { c: 'r', v: 'お' },
+            'ぎゃ': { c: 'g', v: 'あ' }, 'ぎゅ': { c: 'g', v: 'う' }, 'ぎょ': { c: 'g', v: 'お' },
+            'じゃ': { c: 'z', v: 'あ' }, 'じゅ': { c: 'z', v: 'う' }, 'じょ': { c: 'z', v: 'お' },
+            'びゃ': { c: 'b', v: 'あ' }, 'びゅ': { c: 'b', v: 'う' }, 'びょ': { c: 'b', v: 'お' },
+            'ぴゃ': { c: 'p', v: 'あ' }, 'ぴゅ': { c: 'p', v: 'う' }, 'ぴょ': { c: 'p', v: 'お' },
+            'ゃ': { c: '', v: 'あ' }, 'ゅ': { c: '', v: 'う' }, 'ょ': { c: '', v: 'お' }, 'っ': { c: '', v: '' }
+        };
+
+        const FORMANT_MAP = {
+            'あ': [800, 1200, 2600],
+            'い': [300, 2300, 3000],
+            'う': [300, 1200, 2500],
+            'え': [500, 1900, 2600],
+            'お': [500, 800, 2500],
+            'ん': [250, 600, 2200]
+        };
+
+        function base64ToArrayBuffer(base64) {
+            const clean = base64.replace(/^data:audio\/\w+;base64,/, '').trim();
+            const binaryString = window.atob(clean);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /**
+         * Converts standard GitHub file URLs to Raw GitHub user content URLs.
+         */
+        function convertToRawGithubUrl(url) {
+            try {
+                let u = url.trim();
+                if (u.includes('github.com') && u.includes('/blob/')) {
+                    u = u.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+                }
+                return u;
+            } catch (e) {
+                return url;
+            }
+        }
+
+        /**
+         * Parses .vao format file content.
+         */
+        function parseVaoContent(vaoText) {
+            const rawLines = vaoText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+            const lyricLines = [];
+            const b64Lines = [];
+
+            for (const line of rawLines) {
+                if (line.startsWith('data:audio') || line.startsWith('data:') || line.length > 150 || /^([A-Za-z0-9+/=]{100,})$/.test(line)) {
+                    b64Lines.push(line);
+                } else {
+                    lyricLines.push(line);
+                }
+            }
+
+            const mapping = [];
+            const minLen = Math.min(lyricLines.length, b64Lines.length);
+            for (let i = 0; i < minLen; i++) {
+                mapping.push({ lyric: lyricLines[i], b64: b64Lines[i] });
+            }
+            return mapping;
+        }
+
+        function getEffectiveLyric(note, notes) {
+            if (!note) return 'あ';
+            const lyric = note.lyric;
+            if (lyric === 'っ') return 'っ';
+
+            if (lyric === 'ー') {
+                const prevNotes = notes
+                    .filter(n => n.startTick < note.startTick && n.lyric !== 'ー' && n.lyric !== 'っ')
+                    .sort((a, b) => b.startTick - a.startTick);
+
+                if (prevNotes.length > 0) {
+                    const prevLyric = getEffectiveLyric(prevNotes[0], notes);
+                    const kana = KANA_MAP[prevLyric];
+                    return (kana && kana.v) ? kana.v : 'あ';
+                }
+                return 'あ';
+            }
+
+            if (['ゃ', 'ゅ', 'ょ'].includes(lyric)) {
+                const prevNotes = notes
+                    .filter(n => n.startTick < note.startTick && n.lyric !== 'ー' && n.lyric !== 'っ')
+                    .sort((a, b) => b.startTick - a.startTick);
+
+                if (prevNotes.length > 0) {
+                    return prevNotes[0].lyric + lyric;
+                }
+                return lyric === 'ゃ' ? 'あ' : lyric === 'ゅ' ? 'う' : 'お';
+            }
+
+            return lyric;
+        }
+
+        class VocaloidSynthEngine {
+            constructor() {
+                this.ctx = null;
+                this.isInit = false;
+                this.mode = 'formant';
+                this.sampleBuffers = {}; // default / neko sample buffers
+                this.voicebanks = {};    // custom voicebanks store
+                this.activeNodes = [];
+                this.params = {
+                    volume: 0.8,
+                    gender: 12,
+                    vibrato: 0.15,
+                    reverb: 0.3,
+                    bpm: 120
+                };
+            }
+
+            stopAll() {
+                this.activeNodes.forEach(node => {
+                    try {
+                        if (node.stop) node.stop();
+                    } catch (e) {}
+                    try {
+                        if (node.disconnect) node.disconnect();
+                    } catch (e) {}
+                });
+                this.activeNodes = [];
+            }
+
+            init() {
+                if (this.isInit) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.value = this.params.volume;
+
+                this.reverbNode = this.ctx.createConvolver();
+                this.reverbNode.buffer = this.createImpulseResponse(1.8, 2.0);
+
+                this.dryGain = this.ctx.createGain();
+                this.reverbGain = this.ctx.createGain();
+
+                this.dryGain.gain.value = 1.0 - this.params.reverb * 0.5;
+                this.reverbGain.gain.value = this.params.reverb;
+
+                this.masterGain.connect(this.dryGain);
+                this.dryGain.connect(this.ctx.destination);
+
+                this.masterGain.connect(this.reverbNode);
+                this.reverbNode.connect(this.reverbGain);
+                this.reverbGain.connect(this.ctx.destination);
+
+                this.isInit = true;
+                this.loadNekoVoicebank();
+            }
+
+            createImpulseResponse(duration, decay) {
+                const sampleRate = this.ctx.sampleRate;
+                const length = sampleRate * duration;
+                const impulse = this.ctx.createBuffer(2, length, sampleRate);
+                for (let c = 0; c < 2; c++) {
+                    const channel = impulse.getChannelData(c);
+                    for (let i = 0; i < length; i++) {
+                        channel[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+                    }
+                }
+                return impulse;
+            }
+
+            async loadNekoVoicebank() {
+                const statusEl = document.getElementById('voicebank-status');
+                try {
+                    const [txtRes, iniRes] = await Promise.all([
+                        fetch('https://neko.puter.site/u.txt'),
+                        fetch('https://neko.puter.site/oto.ini')
+                    ]);
+
+                    if (!txtRes.ok || !iniRes.ok) throw new Error('音源失敗');
+
+                    const b64Text = await txtRes.text();
+                    const iniText = await iniRes.text();
+
+                    const b64Lines = b64Text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                    const iniLines = iniText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+                    let loadedCount = 0;
+                    for (let i = 0; i < Math.min(b64Lines.length, iniLines.length); i++) {
+                        const lyric = iniLines[i];
+                        const b64 = b64Lines[i];
+                        try {
+                            const arrayBuffer = base64ToArrayBuffer(b64);
+                            const audioBuf = await this.ctx.decodeAudioData(arrayBuffer);
+                            this.sampleBuffers[lyric] = audioBuf;
+                            loadedCount++;
+                        } catch (e) {}
+                    }
+
+                    if (statusEl) {
+                        statusEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-500"></i> Neko音源: ロード完了 (${loadedCount}音素)`;
+                    }
+                } catch (e) {
+                    if (statusEl) {
+                        statusEl.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-600"></i> フォルマント音源を使用中`;
+                    }
+                }
+            }
+
+            async registerVaoVoicebank(vbName, vaoText) {
+                if (!this.isInit) this.init();
+
+                const parsedList = parseVaoContent(vaoText);
+                if (parsedList.length === 0) {
+                    throw new Error('有効な音素データまたはBase64が見つかりませんでした。');
+                }
+
+                const vbId = 'vao_' + Date.now();
+                const buffers = {};
+                let loadedCount = 0;
+
+                for (const item of parsedList) {
+                    try {
+                        const arrayBuffer = base64ToArrayBuffer(item.b64);
+                        const audioBuf = await this.ctx.decodeAudioData(arrayBuffer);
+                        buffers[item.lyric] = audioBuf;
+                        loadedCount++;
+                    } catch (err) {}
+                }
+
+                if (loadedCount === 0) {
+                    throw new Error('Base64音声のデコードに失敗しました。');
+                }
+
+                this.voicebanks[vbId] = {
+                    id: vbId,
+                    name: vbName,
+                    buffers: buffers
+                };
+
+                const modeSelect = document.getElementById('singer-mode');
+                if (modeSelect) {
+                    const opt = document.createElement('option');
+                    opt.value = vbId;
+                    opt.innerText = `✨ ${vbName} (VAO音源 / ${loadedCount}音素)`;
+                    modeSelect.appendChild(opt);
+                    modeSelect.value = vbId;
+                    this.mode = vbId;
+                }
+
+                return { vbId, loadedCount };
+            }
+
+            midiToFreq(midi) {
+                return 440 * Math.pow(2, (midi - 69) / 12);
+            }
+
+            playNote(midiNote, durationSec, lyric = 'あ', startTime = null, originalLyric = null) {
+                if (lyric === 'っ') return;
+                if (!this.isInit) this.init();
+                if (window.AudioContext && this.ctx instanceof AudioContext && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+
+                const now = startTime !== null ? startTime : this.ctx.currentTime;
+                const kanaInfo = KANA_MAP[lyric] || { c: '', v: 'あ' };
+
+                // Handle custom .vao voicebank
+                if (this.voicebanks[this.mode]) {
+                    const vb = this.voicebanks[this.mode];
+                    const sampleBuf = vb.buffers[lyric] ||
+                                      vb.buffers[kanaInfo.v] ||
+                                      (originalLyric ? vb.buffers[originalLyric] : null) ||
+                                      Object.values(vb.buffers)[0];
+                    if (sampleBuf) {
+                        this.playVaoNote(midiNote, durationSec, lyric, now, sampleBuf, kanaInfo);
+                        return;
+                    }
+                }
+
+                // Handle default Neko voicebank
+                if (this.mode === 'neko') {
+                    const sampleBuf = this.sampleBuffers[lyric] || 
+                                      this.sampleBuffers[kanaInfo.v] || 
+                                      (originalLyric ? this.sampleBuffers[originalLyric] : null) ||
+                                      Object.values(this.sampleBuffers)[0];
+                    if (sampleBuf) {
+                        this.playSampleNote(midiNote, durationSec, lyric, now, sampleBuf);
+                        return;
+                    }
+                }
+
+                // Formant Synth Fallback / Cyber Singer
+                const freq = this.midiToFreq(midiNote);
+                const genderShift = Math.pow(2, this.params.gender / 24);
+
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, now);
+
+                if (this.params.vibrato > 0) {
+                    const lfo = this.ctx.createOscillator();
+                    const lfoGain = this.ctx.createGain();
+                    lfo.frequency.setValueAtTime(5.2, now);
+                    lfoGain.gain.setValueAtTime(0, now);
+                    lfoGain.gain.linearRampToValueAtTime(freq * (this.params.vibrato * 0.08), now + Math.min(0.2, durationSec * 0.5));
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(osc.frequency);
+                    lfo.start(now);
+                    lfo.stop(now + durationSec + 0.1);
+                    this.activeNodes.push(lfo);
+                }
+
+                const env = this.ctx.createGain();
+                env.gain.setValueAtTime(0, now);
+                env.gain.linearRampToValueAtTime(1.0, now + 0.02);
+                env.gain.setValueAtTime(0.9, now + durationSec - 0.03);
+                env.gain.linearRampToValueAtTime(0, now + durationSec);
+
+                const formants = FORMANT_MAP[kanaInfo.v] || FORMANT_MAP['あ'];
+                const f1 = this.ctx.createBiquadFilter();
+                const f2 = this.ctx.createBiquadFilter();
+                const f3 = this.ctx.createBiquadFilter();
+
+                f1.type = 'bandpass';
+                f1.frequency.setValueAtTime(formants[0] * genderShift, now);
+                f1.Q.value = 5;
+
+                f2.type = 'bandpass';
+                f2.frequency.setValueAtTime(formants[1] * genderShift, now);
+                f2.Q.value = 7;
+
+                f3.type = 'bandpass';
+                f3.frequency.setValueAtTime(formants[2] * genderShift, now);
+                f3.Q.value = 9;
+
+                osc.connect(f1);
+                osc.connect(f2);
+                osc.connect(f3);
+
+                const voiceMix = this.ctx.createGain();
+                voiceMix.gain.value = 0.5;
+
+                f1.connect(voiceMix);
+                f2.connect(voiceMix);
+                f3.connect(voiceMix);
+
+                voiceMix.connect(env);
+                env.connect(this.masterGain);
+
+                this.activeNodes.push(osc);
+                osc.onended = () => {
+                    const idx = this.activeNodes.indexOf(osc);
+                    if (idx !== -1) this.activeNodes.splice(idx, 1);
+                };
+
+                osc.start(now);
+                osc.stop(now + durationSec + 0.05);
+            }
+
+            playSampleNote(midiNote, durationSec, lyric, startTime, sampleBuf) {
+                const src = this.ctx.createBufferSource();
+                src.buffer = sampleBuf;
+
+                const rate = Math.pow(2, (midiNote - 60) / 12);
+                src.playbackRate.setValueAtTime(rate, startTime);
+
+                // Apply vibrato pitch modulation for sample voice
+                if (this.params.vibrato > 0) {
+                    const lfo = this.ctx.createOscillator();
+                    const lfoGain = this.ctx.createGain();
+                    lfo.frequency.setValueAtTime(5.2, startTime);
+                    lfoGain.gain.setValueAtTime(0, startTime);
+                    lfoGain.gain.linearRampToValueAtTime(rate * (this.params.vibrato * 0.08), startTime + Math.min(0.2, durationSec * 0.5));
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(src.playbackRate);
+                    lfo.start(startTime);
+                    lfo.stop(startTime + durationSec + 0.1);
+                    this.activeNodes.push(lfo);
+                }
+
+                const env = this.ctx.createGain();
+                env.gain.setValueAtTime(0, startTime);
+                env.gain.linearRampToValueAtTime(1.0, startTime + 0.015);
+                env.gain.setValueAtTime(1.0, startTime + Math.max(0, durationSec - 0.03));
+                env.gain.linearRampToValueAtTime(0, startTime + durationSec);
+
+                src.connect(env);
+                env.connect(this.masterGain);
+
+                this.activeNodes.push(src);
+                src.onended = () => {
+                    const idx = this.activeNodes.indexOf(src);
+                    if (idx !== -1) this.activeNodes.splice(idx, 1);
+                };
+
+                src.start(startTime);
+                src.stop(startTime + durationSec + 0.05);
+            }
+
+            playVaoNote(midiNote, durationSec, lyric, startTime, sampleBuf, kanaInfo) {
+                const src = this.ctx.createBufferSource();
+                src.buffer = sampleBuf;
+
+                const rate = Math.pow(2, (midiNote - 60) / 12);
+                src.playbackRate.setValueAtTime(rate, startTime);
+
+                // Apply vibrato pitch modulation
+                if (this.params.vibrato > 0) {
+                    const lfo = this.ctx.createOscillator();
+                    const lfoGain = this.ctx.createGain();
+                    lfo.frequency.setValueAtTime(5.2, startTime);
+                    lfoGain.gain.setValueAtTime(0, startTime);
+                    lfoGain.gain.linearRampToValueAtTime(rate * (this.params.vibrato * 0.08), startTime + Math.min(0.2, durationSec * 0.5));
+                    lfo.connect(lfoGain);
+                    lfoGain.connect(src.playbackRate);
+                    lfo.start(startTime);
+                    lfo.stop(startTime + durationSec + 0.1);
+                    this.activeNodes.push(lfo);
+                }
+
+                const env = this.ctx.createGain();
+                env.gain.setValueAtTime(0, startTime);
+                env.gain.linearRampToValueAtTime(1.0, startTime + 0.015);
+                env.gain.setValueAtTime(1.0, startTime + Math.max(0, durationSec - 0.03));
+                env.gain.linearRampToValueAtTime(0, startTime + durationSec);
+
+                const genderShift = Math.pow(2, (this.params.gender || 12) / 24);
+                const formants = FORMANT_MAP[kanaInfo.v] || FORMANT_MAP['あ'];
+
+                const f1 = this.ctx.createBiquadFilter();
+                const f2 = this.ctx.createBiquadFilter();
+                const f3 = this.ctx.createBiquadFilter();
+
+                f1.type = 'bandpass';
+                f1.frequency.setValueAtTime(formants[0] * genderShift, startTime);
+                f1.Q.value = 5;
+
+                f2.type = 'bandpass';
+                f2.frequency.setValueAtTime(formants[1] * genderShift, startTime);
+                f2.Q.value = 7;
+
+                f3.type = 'bandpass';
+                f3.frequency.setValueAtTime(formants[2] * genderShift, startTime);
+                f3.Q.value = 9;
+
+                const voiceMix = this.ctx.createGain();
+                voiceMix.gain.value = 0.4;
+
+                const dryMix = this.ctx.createGain();
+                dryMix.gain.value = 0.6;
+
+                src.connect(dryMix);
+                src.connect(f1);
+                src.connect(f2);
+                src.connect(f3);
+
+                f1.connect(voiceMix);
+                f2.connect(voiceMix);
+                f3.connect(voiceMix);
+
+                dryMix.connect(env);
+                voiceMix.connect(env);
+                env.connect(this.masterGain);
+
+                this.activeNodes.push(src);
+                src.onended = () => {
+                    const idx = this.activeNodes.indexOf(src);
+                    if (idx !== -1) this.activeNodes.splice(idx, 1);
+                };
+
+                src.start(startTime);
+                src.stop(startTime + durationSec + 0.05);
+            }
+        }
+
+        const synth = new VocaloidSynthEngine();
+
+        // Application State
+        const state = {
+            notes: [
+                { id: 1, startTick: 0, pitch: 60, durationTicks: 4, lyric: 'さ' },
+                { id: 2, startTick: 4, pitch: 62, durationTicks: 4, lyric: 'ー' },
+                { id: 3, startTick: 8, pitch: 64, durationTicks: 4, lyric: 'い' },
+                { id: 4, startTick: 12, pitch: 65, durationTicks: 4, lyric: 'た' }
+            ],
+            bpm: 120,
+            isPlaying: false,
+            currentTick: 0,
+            playbackStartTick: 0,
+            playbackStartTime: 0,
+            totalTicks: 64,
+            selectedNoteForModal: null,
+            moveModeNoteId: null,
+            selectedNoteIds: new Set(),
+            clipboard: [],
+            audioTrackBuffer: null,
+            audioTrackName: '',
+            audioTrackSource: null,
+            audioTrackGain: null,
+            detectedBpm: null
+        };
+
+        function updateBarCountBadge() {
+            const badge = document.getElementById('bar-count-badge');
+            if (badge) {
+                const bars = Math.ceil(state.totalTicks / 4);
+                badge.innerText = `${bars}小節`;
+            }
+        }
+
+        function addMeasures(addBars = 8) {
+            state.totalTicks += addBars * 4;
+            updateBarCountBadge();
+            resizeCanvases();
+        }
+
+        function ensureTickInBounds(tick) {
+            if (tick >= state.totalTicks) {
+                const neededBars = Math.ceil((tick - state.totalTicks + 8) / 4);
+                const expandBars = Math.max(8, Math.ceil(neededBars / 8) * 8);
+                state.totalTicks += expandBars * 4;
+                updateBarCountBadge();
+                resizeCanvases();
+            }
+        }
+
+        // Web Audio API Beat/BPM Detection Algorithm
+        async function analyzeAudioBpm(audioBuffer) {
+            const rawData = audioBuffer.getChannelData(0);
+            const sampleRate = audioBuffer.sampleRate;
+            
+            const step = Math.floor(sampleRate / 100);
+            const energies = [];
+            for (let i = 0; i < rawData.length; i += step) {
+                let sum = 0;
+                for (let j = 0; j < step && (i + j) < rawData.length; j++) {
+                    sum += Math.abs(rawData[i + j]);
+                }
+                energies.push(sum / step);
+            }
+
+            const peaks = [];
+            const threshold = 0.22;
+            for (let i = 1; i < energies.length - 1; i++) {
+                if (energies[i] > threshold && energies[i] > energies[i - 1] && energies[i] > energies[i + 1]) {
+                    peaks.push(i * 10);
+                }
+            }
+
+            const intervals = [];
+            for (let i = 0; i < peaks.length - 1; i++) {
+                for (let j = i + 1; j < Math.min(i + 8, peaks.length); j++) {
+                    const diff = peaks[j] - peaks[i];
+                    if (diff >= 300 && diff <= 1000) {
+                        intervals.push(diff);
+                    }
+                }
+            }
+
+            if (intervals.length === 0) return 120;
+
+            const counts = {};
+            intervals.forEach(intVal => {
+                const rounded = Math.round(intVal / 10) * 10;
+                counts[rounded] = (counts[rounded] || 0) + 1;
+            });
+
+            let topInterval = 500;
+            let maxCount = 0;
+            Object.keys(counts).forEach(k => {
+                if (counts[k] > maxCount) {
+                    maxCount = counts[k];
+                    topInterval = parseInt(k);
+                }
+            });
+
+            const calculatedBpm = Math.round(60000 / topInterval);
+            return Math.min(200, Math.max(60, calculatedBpm));
+        }
+
+        const MIN_MIDI = 36;
+        const MAX_MIDI = 84;
+        const KEY_HEIGHT = 28;
+        const GRID_STEP_PX = 22;
+
+        let gridCanvas, gridCtx, rulerCanvas, rulerCtx, pianoKeysContainer;
+
+        function initPianoKeys() {
+            if (!pianoKeysContainer) return;
+            pianoKeysContainer.innerHTML = '';
+            for (let m = MAX_MIDI; m >= MIN_MIDI; m--) {
+                const key = document.createElement('div');
+                const isBlack = [1, 3, 6, 8, 10].includes(m % 12);
+                key.style.height = `${KEY_HEIGHT}px`;
+                key.className = `border-b border-sky-100 text-[10px] pr-2 flex items-center justify-end font-mono select-none ${
+                    isBlack ? 'bg-sky-900 text-sky-200 font-medium' : 'bg-white text-slate-700 font-semibold'
+                }`;
+                if (m % 12 === 0) {
+                    key.innerText = `C${(m / 12) - 1}`;
+                }
+                pianoKeysContainer.appendChild(key);
+            }
+        }
+
+        function resizeCanvases() {
+            if (!gridCanvas || !rulerCanvas) return;
+            const numKeys = (MAX_MIDI - MIN_MIDI) + 1;
+            const totalWidth = state.totalTicks * GRID_STEP_PX + 200;
+            const totalHeight = numKeys * KEY_HEIGHT;
+
+            gridCanvas.width = totalWidth;
+            gridCanvas.height = totalHeight;
+
+            rulerCanvas.width = totalWidth;
+            rulerCanvas.height = 32;
+
+            drawGrid();
+            drawRuler();
+        }
+
+        function drawRuler() {
+            if (!rulerCtx) return;
+            rulerCtx.clearRect(0, 0, rulerCanvas.width, rulerCanvas.height);
+            rulerCtx.fillStyle = '#ffffff';
+            rulerCtx.fillRect(0, 0, rulerCanvas.width, rulerCanvas.height);
+
+            rulerCtx.strokeStyle = '#cbd5e1';
+            rulerCtx.fillStyle = '#64748b';
+            rulerCtx.font = '500 11px Inter, sans-serif';
+
+            for (let t = 0; t <= state.totalTicks; t++) {
+                const x = t * GRID_STEP_PX;
+                if (t % 4 === 0) {
+                    rulerCtx.beginPath();
+                    rulerCtx.moveTo(x, 14);
+                    rulerCtx.lineTo(x, 32);
+                    rulerCtx.stroke();
+                    rulerCtx.fillText(`${(t / 4) + 1}`, x + 4, 12);
+                } else {
+                    rulerCtx.beginPath();
+                    rulerCtx.moveTo(x, 22);
+                    rulerCtx.lineTo(x, 32);
+                    rulerCtx.stroke();
+                }
+            }
+
+            const px = state.currentTick * GRID_STEP_PX;
+            rulerCtx.fillStyle = '#06b6d4';
+            rulerCtx.beginPath();
+            rulerCtx.moveTo(px - 6, 0);
+            rulerCtx.lineTo(px + 6, 0);
+            rulerCtx.lineTo(px, 12);
+            rulerCtx.fill();
+
+            rulerCtx.strokeStyle = '#06b6d4';
+            rulerCtx.lineWidth = 2;
+            rulerCtx.beginPath();
+            rulerCtx.moveTo(px, 12);
+            rulerCtx.lineTo(px, 32);
+            rulerCtx.stroke();
+            rulerCtx.lineWidth = 1;
+        }
+
+        function drawGrid() {
+            if (!gridCtx) return;
+            gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+            const numKeys = (MAX_MIDI - MIN_MIDI) + 1;
+
+            // Rows Background
+            for (let i = 0; i < numKeys; i++) {
+                const midi = MAX_MIDI - i;
+                const isBlack = [1, 3, 6, 8, 10].includes(midi % 12);
+                gridCtx.fillStyle = isBlack ? '#f1f5f9' : '#ffffff';
+                gridCtx.fillRect(0, i * KEY_HEIGHT, gridCanvas.width, KEY_HEIGHT);
+
+                gridCtx.strokeStyle = '#e2e8f0';
+                gridCtx.beginPath();
+                gridCtx.moveTo(0, (i + 1) * KEY_HEIGHT);
+                gridCtx.lineTo(gridCanvas.width, (i + 1) * KEY_HEIGHT);
+                gridCtx.stroke();
+            }
+
+            // Vertical Time Columns
+            for (let t = 0; t <= state.totalTicks; t++) {
+                const x = t * GRID_STEP_PX;
+                gridCtx.strokeStyle = (t % 4 === 0) ? '#cbd5e1' : '#f1f5f9';
+                gridCtx.lineWidth = (t % 4 === 0) ? 1.5 : 1;
+                gridCtx.beginPath();
+                gridCtx.moveTo(x, 0);
+                gridCtx.lineTo(x, gridCanvas.height);
+                gridCtx.stroke();
+            }
+
+            // Draw Notes
+            state.notes.forEach(note => {
+                const x = note.startTick * GRID_STEP_PX;
+                const y = (MAX_MIDI - note.pitch) * KEY_HEIGHT;
+                const w = note.durationTicks * GRID_STEP_PX;
+
+                const isMultiSelected = state.selectedNoteIds.has(note.id);
+                const isSelected = isMultiSelected || (state.selectedNoteForModal && state.selectedNoteForModal.id === note.id);
+                const isMoveMode = state.moveModeNoteId === note.id;
+
+                const grad = gridCtx.createLinearGradient(x, y, x + w, y + KEY_HEIGHT);
+                if (isMoveMode) {
+                    grad.addColorStop(0, '#f59e0b');
+                    grad.addColorStop(1, '#d97706');
+                } else if (isMultiSelected) {
+                    grad.addColorStop(0, '#6366f1');
+                    grad.addColorStop(1, '#4f46e5');
+                } else {
+                    grad.addColorStop(0, isSelected ? '#38bdf8' : '#06b6d4');
+                    grad.addColorStop(1, '#0284c7');
+                }
+
+                gridCtx.fillStyle = grad;
+                gridCtx.beginPath();
+                gridCtx.roundRect(x + 1.5, y + 2.5, w - 3, KEY_HEIGHT - 5, 6);
+                gridCtx.fill();
+
+                gridCtx.strokeStyle = isMoveMode ? '#b45309' : (isMultiSelected ? '#c7d2fe' : (isSelected ? '#f59e0b' : '#38bdf8'));
+                gridCtx.lineWidth = (isSelected || isMoveMode || isMultiSelected) ? 2.5 : 1;
+                if (isMoveMode) {
+                    gridCtx.setLineDash([4, 2]);
+                } else {
+                    gridCtx.setLineDash([]);
+                }
+                gridCtx.stroke();
+                gridCtx.setLineDash([]);
+
+                gridCtx.fillStyle = '#ffffff';
+                gridCtx.font = 'bold 12px Inter, sans-serif';
+                gridCtx.textAlign = 'center';
+                gridCtx.textBaseline = 'middle';
+                const label = isMoveMode ? `✥ ${note.lyric}` : note.lyric;
+                gridCtx.fillText(label, x + (w / 2), y + (KEY_HEIGHT / 2));
+            });
+
+            if (isBoxSelecting && selectionBox) {
+                const sx = Math.min(selectionBox.x1, selectionBox.x2);
+                const sy = Math.min(selectionBox.y1, selectionBox.y2);
+                const sw = Math.abs(selectionBox.x2 - selectionBox.x1);
+                const sh = Math.abs(selectionBox.y2 - selectionBox.y1);
+
+                gridCtx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+                gridCtx.strokeStyle = '#6366f1';
+                gridCtx.lineWidth = 1.5;
+                gridCtx.setLineDash([4, 4]);
+                gridCtx.fillRect(sx, sy, sw, sh);
+                gridCtx.strokeRect(sx, sy, sw, sh);
+                gridCtx.setLineDash([]);
+            }
+
+            // Playhead Line
+            const px = state.currentTick * GRID_STEP_PX;
+            gridCtx.strokeStyle = '#06b6d4';
+            gridCtx.lineWidth = 2;
+            gridCtx.beginPath();
+            gridCtx.moveTo(px, 0);
+            gridCtx.lineTo(px, gridCanvas.height);
+            gridCtx.stroke();
+        }
+
+        function getCanvasCoords(e, canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+            const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        let activeNote = null;
+        let isDragging = false;
+        let isResizing = false;
+        let isBoxSelecting = false;
+        let selectionBox = null;
+        let pointerDownStartCoords = null;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        let dragStartPositions = [];
+        let touchStartTime = 0;
+        let lastTapTime = 0;
+        let lastTapNoteId = null;
+
+        function copySelectedNotes() {
+            if (state.selectedNoteIds.size === 0 && state.selectedNoteForModal) {
+                state.selectedNoteIds.add(state.selectedNoteForModal.id);
+            }
+            if (state.selectedNoteIds.size === 0) return;
+
+            const selectedNotes = state.notes.filter(n => state.selectedNoteIds.has(n.id));
+            if (selectedNotes.length === 0) return;
+
+            const minTick = Math.min(...selectedNotes.map(n => n.startTick));
+            state.clipboard = selectedNotes.map(n => ({
+                offsetTick: n.startTick - minTick,
+                pitch: n.pitch,
+                durationTicks: n.durationTicks,
+                lyric: n.lyric
+            }));
+        }
+
+        function pasteNotes() {
+            if (!state.clipboard || state.clipboard.length === 0) return;
+
+            const targetTick = Math.floor(state.currentTick);
+            state.selectedNoteIds.clear();
+
+            const newNotes = state.clipboard.map(item => {
+                const startTick = Math.max(0, targetTick + item.offsetTick);
+                ensureTickInBounds(startTick + item.durationTicks);
+                const newNote = {
+                    id: Date.now() + Math.floor(Math.random() * 100000),
+                    startTick: startTick,
+                    pitch: item.pitch,
+                    durationTicks: item.durationTicks,
+                    lyric: item.lyric
+                };
+                state.selectedNoteIds.add(newNote.id);
+                return newNote;
+            });
+
+            state.notes.push(...newNotes);
+            if (newNotes.length > 0) {
+                openNoteModal(newNotes[0]);
+            }
+            drawGrid();
+        }
+
+        function selectAllNotes() {
+            state.selectedNoteIds.clear();
+            state.notes.forEach(n => state.selectedNoteIds.add(n.id));
+            if (state.notes.length > 0) {
+                openNoteModal(state.notes[0]);
+            }
+            drawGrid();
+        }
+
+        function deleteSelectedNotes() {
+            if (state.selectedNoteIds.size > 0) {
+                state.notes = state.notes.filter(n => !state.selectedNoteIds.has(n.id));
+                state.selectedNoteIds.clear();
+                closeNoteModal();
+                drawGrid();
+            } else if (state.selectedNoteForModal) {
+                state.notes = state.notes.filter(n => n.id !== state.selectedNoteForModal.id);
+                closeNoteModal();
+                drawGrid();
+            }
+        }
+
+        function handlePointerDown(coords, isRightClick = false, isShiftPressed = false) {
+            const tick = Math.floor(coords.x / GRID_STEP_PX);
+            const pitch = MAX_MIDI - Math.floor(coords.y / KEY_HEIGHT);
+
+            if (isRightClick) {
+                deleteSelectedNotes();
+                return;
+            }
+
+            const now = Date.now();
+
+            const foundNote = state.notes.find(n => {
+                const nx = n.startTick * GRID_STEP_PX;
+                const ny = (MAX_MIDI - n.pitch) * KEY_HEIGHT;
+                const nw = n.durationTicks * GRID_STEP_PX;
+                const margin = 4;
+                return coords.x >= nx - margin && coords.x <= nx + nw + margin && coords.y >= ny - margin && coords.y <= ny + KEY_HEIGHT + margin;
+            });
+
+            if (foundNote) {
+                if (isShiftPressed) {
+                    if (state.selectedNoteIds.has(foundNote.id)) {
+                        state.selectedNoteIds.delete(foundNote.id);
+                    } else {
+                        state.selectedNoteIds.add(foundNote.id);
+                    }
+                } else if (!state.selectedNoteIds.has(foundNote.id)) {
+                    state.selectedNoteIds.clear();
+                    state.selectedNoteIds.add(foundNote.id);
+                }
+
+                const nx = foundNote.startTick * GRID_STEP_PX;
+                const nw = foundNote.durationTicks * GRID_STEP_PX;
+
+                const isDoubleTap = (now - lastTapTime < 350) && (lastTapNoteId === foundNote.id);
+                lastTapTime = now;
+                lastTapNoteId = foundNote.id;
+
+                if (isDoubleTap) {
+                    state.moveModeNoteId = foundNote.id;
+                    openNoteModal(foundNote);
+                    isDragging = true;
+                    activeNote = foundNote;
+                    dragOffsetX = coords.x - nx;
+                    dragOffsetY = coords.y - ((MAX_MIDI - foundNote.pitch) * KEY_HEIGHT);
+
+                    dragStartPositions = state.notes
+                        .filter(n => state.selectedNoteIds.has(n.id))
+                        .map(n => ({ id: n.id, startTick: n.startTick, pitch: n.pitch }));
+
+                    const effectiveLyric = getEffectiveLyric(foundNote, state.notes);
+                    synth.playNote(foundNote.pitch, 0.2, effectiveLyric, null, foundNote.lyric);
+                    drawGrid();
+                    return;
+                }
+
+                openNoteModal(foundNote);
+
+                if (coords.x >= nx + nw - 12 && coords.x <= nx + nw + 6) {
+                    isResizing = true;
+                    activeNote = foundNote;
+                } else {
+                    isDragging = true;
+                    activeNote = foundNote;
+                    dragOffsetX = coords.x - nx;
+                    dragOffsetY = coords.y - ((MAX_MIDI - foundNote.pitch) * KEY_HEIGHT);
+
+                    dragStartPositions = state.notes
+                        .filter(n => state.selectedNoteIds.has(n.id))
+                        .map(n => ({ id: n.id, startTick: n.startTick, pitch: n.pitch }));
+
+                    const effectiveLyric = getEffectiveLyric(foundNote, state.notes);
+                    synth.playNote(foundNote.pitch, 0.2, effectiveLyric, null, foundNote.lyric);
+                }
+            } else {
+                if (!isShiftPressed) {
+                    state.selectedNoteIds.clear();
+                }
+
+                isBoxSelecting = true;
+                pointerDownStartCoords = { x: coords.x, y: coords.y };
+                selectionBox = { x1: coords.x, y1: coords.y, x2: coords.x, y2: coords.y };
+                closeNoteModal();
+                drawGrid();
+            }
+        }
+
+        function handlePointerMove(coords) {
+            if (isBoxSelecting && selectionBox) {
+                selectionBox.x2 = coords.x;
+                selectionBox.y2 = coords.y;
+
+                const bx1 = Math.min(selectionBox.x1, selectionBox.x2);
+                const bx2 = Math.max(selectionBox.x1, selectionBox.x2);
+                const by1 = Math.min(selectionBox.y1, selectionBox.y2);
+                const by2 = Math.max(selectionBox.y1, selectionBox.y2);
+
+                state.selectedNoteIds.clear();
+                state.notes.forEach(n => {
+                    const nx = n.startTick * GRID_STEP_PX;
+                    const ny = (MAX_MIDI - n.pitch) * KEY_HEIGHT;
+                    const nw = n.durationTicks * GRID_STEP_PX;
+                    const nh = KEY_HEIGHT;
+
+                    if (nx < bx2 && nx + nw > bx1 && ny < by2 && ny + nh > by1) {
+                        state.selectedNoteIds.add(n.id);
+                    }
+                });
+                drawGrid();
+            } else if (isResizing && activeNote) {
+                const currentTick = Math.max(1, Math.round(coords.x / GRID_STEP_PX));
+                activeNote.durationTicks = Math.max(1, currentTick - activeNote.startTick);
+                ensureTickInBounds(activeNote.startTick + activeNote.durationTicks);
+                drawGrid();
+            } else if (isDragging && activeNote) {
+                const newStartTick = Math.max(0, Math.floor((coords.x - dragOffsetX) / GRID_STEP_PX));
+                const newPitch = Math.min(MAX_MIDI, Math.max(MIN_MIDI, MAX_MIDI - Math.floor((coords.y - dragOffsetY) / KEY_HEIGHT)));
+
+                const tickDelta = newStartTick - activeNote.startTick;
+                const pitchDelta = newPitch - activeNote.pitch;
+
+                if (tickDelta !== 0 || pitchDelta !== 0) {
+                    if (state.selectedNoteIds.size > 1 && dragStartPositions.length > 0) {
+                        dragStartPositions.forEach(pos => {
+                            const note = state.notes.find(n => n.id === pos.id);
+                            if (note) {
+                                note.startTick = Math.max(0, pos.startTick + (newStartTick - (dragStartPositions.find(p => p.id === activeNote.id)?.startTick || activeNote.startTick)));
+                                note.pitch = Math.min(MAX_MIDI, Math.max(MIN_MIDI, pos.pitch + (newPitch - (dragStartPositions.find(p => p.id === activeNote.id)?.pitch || activeNote.pitch))));
+                                ensureTickInBounds(note.startTick + note.durationTicks);
+                            }
+                        });
+                    } else {
+                        activeNote.startTick = newStartTick;
+                        activeNote.pitch = newPitch;
+                        ensureTickInBounds(activeNote.startTick + activeNote.durationTicks);
+                    }
+
+                    if (pitchDelta !== 0) {
+                        const effectiveLyric = getEffectiveLyric(activeNote, state.notes);
+                        synth.playNote(newPitch, 0.15, effectiveLyric, null, activeNote.lyric);
+                    }
+                }
+                drawGrid();
+            }
+        }
+
+        function handlePointerUp() {
+            isDragging = false;
+            isResizing = false;
+            if (isBoxSelecting) {
+                const dist = pointerDownStartCoords ? Math.hypot(selectionBox.x2 - selectionBox.x1, selectionBox.y2 - selectionBox.y1) : 0;
+                
+                isBoxSelecting = false;
+                const wasStartCoords = pointerDownStartCoords;
+                pointerDownStartCoords = null;
+                selectionBox = null;
+
+                if (dist < 6 && wasStartCoords) {
+                    const tick = Math.floor(wasStartCoords.x / GRID_STEP_PX);
+                    const pitch = MAX_MIDI - Math.floor(wasStartCoords.y / KEY_HEIGHT);
+
+                    if (tick >= 0 && tick < state.totalTicks && pitch >= MIN_MIDI && pitch <= MAX_MIDI) {
+                        const newNote = {
+                            id: Date.now() + Math.floor(Math.random() * 100000),
+                            startTick: tick,
+                            pitch: pitch,
+                            durationTicks: 4,
+                            lyric: 'あ'
+                        };
+                        state.notes.push(newNote);
+                        state.selectedNoteIds.clear();
+                        state.selectedNoteIds.add(newNote.id);
+                        openNoteModal(newNote);
+
+                        const effectiveLyric = getEffectiveLyric(newNote, state.notes);
+                        synth.playNote(pitch, 0.2, effectiveLyric, null, newNote.lyric);
+                    }
+                } else if (state.selectedNoteIds.size > 0) {
+                    const firstSelected = state.notes.find(n => state.selectedNoteIds.has(n.id));
+                    if (firstSelected) openNoteModal(firstSelected);
+                }
+            }
+            activeNote = null;
+            dragStartPositions = [];
+            drawGrid();
+        }
+
+        let noteModal, modalInput, modalDeleteBtn, modalMoveBtn, modalCloseBtn;
+
+        function getNoteName(midi) {
+            const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octave = Math.floor(midi / 12) - 1;
+            return names[midi % 12] + octave;
+        }
+
+        function openNoteModal(note) {
+            state.selectedNoteForModal = note;
+            if (modalInput) modalInput.value = note.lyric;
+            const noteInfoEl = document.getElementById('note-info-label');
+            const moveTextEl = document.getElementById('modal-move-text');
+            if (noteInfoEl) {
+                const count = state.selectedNoteIds.size;
+                noteInfoEl.innerText = count > 1 ? `選択中: ${count}個のノート` : `ノートプロパティ (${getNoteName(note.pitch)})`;
+            }
+            if (moveTextEl) {
+                moveTextEl.innerText = state.moveModeNoteId === note.id ? '移動解除' : '移動';
+            }
+            if (noteModal) {
+                noteModal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    noteModal.classList.remove('translate-y-full');
+                });
+            }
+            drawGrid();
+        }
+
+        function closeNoteModal() {
+            if (noteModal) {
+                noteModal.classList.add('translate-y-full');
+                setTimeout(() => {
+                    noteModal.classList.add('hidden');
+                }, 200);
+            }
+            state.selectedNoteForModal = null;
+            state.moveModeNoteId = null;
+            drawGrid();
+        }
+
+        let playInterval = null;
+
+        function playSequence() {
+            if (state.isPlaying) return;
+            synth.init();
+
+            state.isPlaying = true;
+            const playBtn = document.getElementById('btn-play');
+            if (playBtn) {
+                playBtn.classList.replace('from-cyan-500', 'from-amber-500');
+                playBtn.classList.replace('to-sky-500', 'to-orange-400');
+                playBtn.innerHTML = '<i class="fa-solid fa-pause"></i> <span class="hidden sm:inline">一時停止</span>';
+            }
+
+            state.playbackStartTick = state.currentTick;
+            state.playbackStartTime = synth.ctx.currentTime;
+
+            const secondsPerTick = (60 / state.bpm) / 4;
+
+            if (state.audioTrackBuffer) {
+                if (state.audioTrackSource) {
+                    try { state.audioTrackSource.stop(); } catch(e){}
+                }
+                state.audioTrackSource = synth.ctx.createBufferSource();
+                state.audioTrackSource.buffer = state.audioTrackBuffer;
+
+                if (!state.audioTrackGain) {
+                    state.audioTrackGain = synth.ctx.createGain();
+                    const volVal = parseFloat(document.getElementById('param-audio-vol')?.value || 0.7);
+                    state.audioTrackGain.gain.value = volVal;
+                    state.audioTrackGain.connect(synth.ctx.destination);
+                }
+
+                state.audioTrackSource.connect(state.audioTrackGain);
+                const startOffsetSec = state.playbackStartTick * secondsPerTick;
+                if (startOffsetSec < state.audioTrackBuffer.duration) {
+                    state.audioTrackSource.start(synth.ctx.currentTime, startOffsetSec);
+                }
+            }
+
+            state.notes.forEach(note => {
+                if (note.startTick >= state.currentTick) {
+                    const delayTicks = note.startTick - state.currentTick;
+                    const noteStartTime = state.playbackStartTime + (delayTicks * secondsPerTick);
+                    const noteDuration = note.durationTicks * secondsPerTick;
+                    const effectiveLyric = getEffectiveLyric(note, state.notes);
+                    synth.playNote(note.pitch, noteDuration, effectiveLyric, noteStartTime, note.lyric);
+                }
+            });
+
+            function tickLoop() {
+                if (!state.isPlaying) return;
+                const elapsedSec = synth.ctx.currentTime - state.playbackStartTime;
+                const elapsedTicks = elapsedSec / secondsPerTick;
+                state.currentTick = state.playbackStartTick + elapsedTicks;
+
+                if (state.currentTick >= state.totalTicks) {
+                    stopSequence(true);
+                    return;
+                }
+
+                drawGrid();
+                drawRuler();
+                playInterval = requestAnimationFrame(tickLoop);
+            }
+            playInterval = requestAnimationFrame(tickLoop);
+        }
+
+        function stopSequence(resetPosition = true) {
+            state.isPlaying = false;
+            if (playInterval) cancelAnimationFrame(playInterval);
+
+            synth.stopAll();
+
+            if (state.audioTrackSource) {
+                try { state.audioTrackSource.stop(); } catch(e){}
+                state.audioTrackSource = null;
+            }
+
+            if (resetPosition) {
+                state.currentTick = 0;
+            }
+
+            const playBtn = document.getElementById('btn-play');
+            if (playBtn) {
+                playBtn.classList.replace('from-amber-500', 'from-cyan-500');
+                playBtn.classList.replace('to-orange-400', 'to-sky-500');
+                playBtn.innerHTML = '<i class="fa-solid fa-play"></i> <span class="hidden sm:inline">再生</span>';
+            }
+
+            drawGrid();
+            drawRuler();
+        }
+
+        // Fixed WAV Audio Encoder function
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1;
+            const bitDepth = 16;
+
+            let result;
+            if (numChannels === 2) {
+                const l = buffer.getChannelData(0);
+                const r = buffer.getChannelData(1);
+                result = new Float32Array(l.length + r.length);
+                for (let i = 0; i < l.length; i++) {
+                    result[i * 2] = l[i];
+                    result[i * 2 + 1] = r[i];
+                }
+            } else {
+                result = buffer.getChannelData(0);
+            }
+
+            const dataLength = result.length * (bitDepth / 8);
+            const bufferArray = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(bufferArray);
+
+            const writeString = (offset, str) => {
+                for (let i = 0; i < str.length; i++) {
+                    view.setUint8(offset + i, str.charCodeAt(i));
+                }
+            };
+
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + dataLength, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numChannels * (bitDepth / 8), true);
+            view.setUint16(32, numChannels * (bitDepth / 8), true);
+            view.setUint16(34, bitDepth, true);
+            writeString(36, 'data');
+            view.setUint32(40, dataLength, true);
+
+            let offset = 44;
+            for (let i = 0; i < result.length; i++) {
+                const s = Math.max(-1, Math.min(1, result[i]));
+                view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                offset += 2;
+            }
+
+            return new Blob([bufferArray], { type: 'audio/wav' });
+        }
+
+        window.onload = () => {
+            gridCanvas = document.getElementById('grid-canvas');
+            gridCtx = gridCanvas.getContext('2d');
+            rulerCanvas = document.getElementById('ruler-canvas');
+            rulerCtx = rulerCanvas.getContext('2d');
+            pianoKeysContainer = document.getElementById('piano-keys');
+
+            noteModal = document.getElementById('note-modal');
+            modalInput = document.getElementById('modal-lyric-input');
+            modalDeleteBtn = document.getElementById('modal-delete-btn');
+            modalMoveBtn = document.getElementById('modal-move-btn');
+            modalCloseBtn = document.getElementById('modal-close');
+
+            const btnAddMeasures = document.getElementById('btn-add-measures');
+            if (btnAddMeasures) {
+                btnAddMeasures.addEventListener('click', () => {
+                    addMeasures(8);
+                });
+            }
+
+            // .vao Voicebank Loader Listeners
+            const inputVaoFile = document.getElementById('input-vao-file');
+            const btnLoadVaoFile = document.getElementById('btn-load-vao-file');
+            const inputVaoUrl = document.getElementById('input-vao-url');
+            const btnLoadVaoUrl = document.getElementById('btn-load-vao-url');
+            const vaoStatusBadge = document.getElementById('vao-status-badge');
+            const vaoInfoContainer = document.getElementById('vao-info-container');
+            const vaoLoadedName = document.getElementById('vao-loaded-name');
+            const vaoLoadedCount = document.getElementById('vao-loaded-count');
+
+            const applyVaoContent = async (name, vaoText) => {
+                vaoStatusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-indigo-500"></i> ロード中...';
+                try {
+                    const result = await synth.registerVaoVoicebank(name, vaoText);
+                    vaoStatusBadge.innerHTML = '<i class="fa-solid fa-check text-emerald-500"></i> 追加完了';
+                    if (vaoInfoContainer) vaoInfoContainer.classList.remove('hidden');
+                    if (vaoLoadedName) vaoLoadedName.innerText = name;
+                    if (vaoLoadedCount) vaoLoadedCount.innerText = `読み込み音素数: ${result.loadedCount}音素`;
+                } catch (err) {
+                    vaoStatusBadge.innerHTML = '<i class="fa-solid fa-circle-exclamation text-red-500"></i> エラー';
+                }
+            };
+
+            // Local .vao file upload
+            if (btnLoadVaoFile && inputVaoFile) {
+                btnLoadVaoFile.addEventListener('click', () => inputVaoFile.click());
+                inputVaoFile.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        const vaoText = evt.target.result;
+                        const voiceName = file.name.replace(/\.(vao|txt)$/i, '');
+                        applyVaoContent(voiceName, vaoText);
+                    };
+                    reader.readAsText(file);
+                });
+            }
+
+            // Remote .vao URL loading
+            if (btnLoadVaoUrl && inputVaoUrl) {
+                btnLoadVaoUrl.addEventListener('click', async () => {
+                    const rawUrl = inputVaoUrl.value.trim();
+                    if (!rawUrl) return;
+
+                    const targetUrl = convertToRawGithubUrl(rawUrl);
+                    vaoStatusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-indigo-500"></i> 取得中...';
+
+                    try {
+                        const res = await fetch(targetUrl);
+                        if (!res.ok) throw new Error(`HTTPエラー: ${res.status}`);
+                        const vaoText = await res.text();
+                        
+                        const urlParts = rawUrl.split('/');
+                        const fileName = urlParts[urlParts.length - 1].split('?')[0].replace(/\.(vao|txt)$/i, '') || 'カスタムVAO音源';
+                        
+                        await applyVaoContent(fileName, vaoText);
+                    } catch (err) {
+                        vaoStatusBadge.innerHTML = '<i class="fa-solid fa-circle-exclamation text-red-500"></i> 失敗';
+                    }
+                });
+            }
+
+            // Audio Track Load Handling
+            const inputAudioTrack = document.getElementById('input-audio-track');
+            const btnLoadAudio = document.getElementById('btn-load-audio');
+            const audioTrackControls = document.getElementById('audio-track-controls');
+            const audioTrackStatus = document.getElementById('audio-track-status');
+            const audioTrackName = document.getElementById('audio-track-name');
+            const detectedBpmVal = document.getElementById('detected-bpm-val');
+            const btnApplyBpm = document.getElementById('btn-apply-bpm');
+            const paramAudioVol = document.getElementById('param-audio-vol');
+            const valAudioVol = document.getElementById('val-audio-vol');
+
+            if (btnLoadAudio && inputAudioTrack) {
+                btnLoadAudio.addEventListener('click', () => inputAudioTrack.click());
+
+                inputAudioTrack.addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    synth.init();
+                    audioTrackStatus.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan-500"></i> 解析中...';
+                    audioTrackName.innerText = file.name;
+                    audioTrackControls.classList.remove('hidden');
+                    btnApplyBpm.classList.add('hidden');
+                    detectedBpmVal.innerText = '解析中...';
+
+                    try {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const decodedBuffer = await synth.ctx.decodeAudioData(arrayBuffer);
+                        
+                        state.audioTrackBuffer = decodedBuffer;
+                        state.audioTrackName = file.name;
+                        audioTrackStatus.innerHTML = '<i class="fa-solid fa-check text-emerald-500"></i> ロード完了';
+
+                        const bpm = await analyzeAudioBpm(decodedBuffer);
+                        state.detectedBpm = bpm;
+                        detectedBpmVal.innerText = `${bpm} BPM`;
+                        btnApplyBpm.classList.remove('hidden');
+                    } catch (err) {
+                        audioTrackStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i> エラー';
+                    }
+                });
+            }
+
+            if (btnApplyBpm) {
+                btnApplyBpm.addEventListener('click', () => {
+                    if (state.detectedBpm) {
+                        updateBpm(state.detectedBpm);
+                        btnApplyBpm.innerText = '適用済み';
+                        setTimeout(() => { btnApplyBpm.innerText = 'BPM適用'; }, 1500);
+                    }
+                });
+            }
+
+            if (paramAudioVol) {
+                paramAudioVol.addEventListener('input', (e) => {
+                    const v = parseFloat(e.target.value);
+                    if (state.audioTrackGain) {
+                        state.audioTrackGain.gain.value = v;
+                    }
+                    if (valAudioVol) valAudioVol.innerText = `${Math.round(v * 100)}%`;
+                });
+            }
+
+            // Sidebar toggles
+            const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+            if (btnToggleSidebar && sidebar && sidebarOverlay) {
+                const toggleSidebar = () => {
+                    sidebar.classList.toggle('-translate-x-full');
+                    sidebarOverlay.classList.toggle('hidden');
+                };
+                btnToggleSidebar.addEventListener('click', toggleSidebar);
+                sidebarOverlay.addEventListener('click', toggleSidebar);
+            }
+
+            // Timeline Seeking
+            rulerCanvas.addEventListener('click', (e) => {
+                const rect = rulerCanvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickedTick = Math.max(0, Math.min(state.totalTicks, Math.floor(clickX / GRID_STEP_PX)));
+
+                state.currentTick = clickedTick;
+
+                if (state.isPlaying) {
+                    stopSequence(false);
+                    playSequence();
+                } else {
+                    drawGrid();
+                    drawRuler();
+                }
+            });
+
+            // Grid Canvas Mouse Events
+            gridCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+            gridCanvas.addEventListener('mousedown', (e) => {
+                const coords = getCanvasCoords(e, gridCanvas);
+                handlePointerDown(coords, e.button === 2, e.shiftKey);
+            });
+
+            gridCanvas.addEventListener('mousemove', (e) => {
+                const coords = getCanvasCoords(e, gridCanvas);
+                handlePointerMove(coords);
+            });
+
+            window.addEventListener('mouseup', handlePointerUp);
+
+            // Copy / Paste / Select All Toolbar Listeners
+            document.getElementById('btn-copy').addEventListener('click', copySelectedNotes);
+            document.getElementById('btn-paste').addEventListener('click', pasteNotes);
+            document.getElementById('btn-select-all').addEventListener('click', selectAllNotes);
+
+            // Keyboard Shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+                    e.preventDefault();
+                    copySelectedNotes();
+                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+                    e.preventDefault();
+                    pasteNotes();
+                } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                    e.preventDefault();
+                    selectAllNotes();
+                } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    deleteSelectedNotes();
+                }
+            });
+
+            // Grid Canvas Touch Events
+            gridCanvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    touchStartTime = Date.now();
+                    const coords = getCanvasCoords(e, gridCanvas);
+                    handlePointerDown(coords);
+                }
+            }, { passive: false });
+
+            gridCanvas.addEventListener('touchmove', (e) => {
+                if (isDragging || isResizing || isBoxSelecting) {
+                    if (e.cancelable) e.preventDefault();
+                }
+                if (e.touches && e.touches.length > 0) {
+                    const coords = getCanvasCoords(e, gridCanvas);
+                    handlePointerMove(coords);
+                }
+            }, { passive: false });
+
+            window.addEventListener('touchend', handlePointerUp);
+            window.addEventListener('touchcancel', handlePointerUp);
+
+            // Bottom Property Sheet Listeners
+            if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeNoteModal);
+
+            if (modalMoveBtn) {
+                modalMoveBtn.addEventListener('click', () => {
+                    if (state.selectedNoteForModal) {
+                        if (state.moveModeNoteId === state.selectedNoteForModal.id) {
+                            state.moveModeNoteId = null;
+                        } else {
+                            state.moveModeNoteId = state.selectedNoteForModal.id;
+                        }
+                        openNoteModal(state.selectedNoteForModal);
+                    }
+                });
+            }
+
+            if (modalInput) {
+                modalInput.addEventListener('input', (e) => {
+                    if (state.selectedNoteForModal) {
+                        state.selectedNoteForModal.lyric = e.target.value || 'あ';
+                        drawGrid();
+                    }
+                });
+                modalInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') closeNoteModal();
+                });
+            }
+
+            if (modalDeleteBtn) {
+                modalDeleteBtn.addEventListener('click', () => {
+                    if (state.selectedNoteForModal) {
+                        state.notes = state.notes.filter(n => n.id !== state.selectedNoteForModal.id);
+                        drawGrid();
+                    }
+                    closeNoteModal();
+                });
+            }
+
+            // Playback controls
+            document.getElementById('btn-play').addEventListener('click', () => {
+                if (state.isPlaying) {
+                    stopSequence(false);
+                } else {
+                    playSequence();
+                }
+            });
+
+            document.getElementById('btn-stop').addEventListener('click', () => stopSequence(true));
+
+            document.getElementById('singer-mode').addEventListener('change', (e) => {
+                synth.mode = e.target.value;
+            });
+
+            // Volume Slider
+            document.getElementById('param-volume').addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                synth.params.volume = v;
+                if (synth.masterGain) synth.masterGain.gain.value = v;
+                document.getElementById('val-volume').innerText = `${Math.round(v * 100)}%`;
+            });
+
+            // FIXED: Vibrato Slider Event Listener
+            document.getElementById('param-vibrato').addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                synth.params.vibrato = v;
+                document.getElementById('val-vibrato').innerText = `${Math.round(v * 100)}%`;
+            });
+
+            // FIXED: Reverb Slider Event Listener
+            document.getElementById('param-reverb').addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                synth.params.reverb = v;
+                if (synth.dryGain && synth.reverbGain) {
+                    synth.dryGain.gain.value = 1.0 - v * 0.5;
+                    synth.reverbGain.gain.value = v;
+                }
+                document.getElementById('val-reverb').innerText = `${Math.round(v * 100)}%`;
+            });
+
+            // BPM Slider & Header Input
+            const paramBpm = document.getElementById('param-bpm');
+            const valBpm = document.getElementById('val-bpm');
+            const headerBpmInput = document.getElementById('header-bpm-input');
+
+            const updateBpm = (newBpm) => {
+                const bpmVal = Math.min(240, Math.max(40, parseInt(newBpm) || 120));
+                state.bpm = bpmVal;
+                synth.params.bpm = bpmVal;
+                if (paramBpm) paramBpm.value = bpmVal;
+                if (valBpm) valBpm.innerText = `${bpmVal}`;
+                if (headerBpmInput) headerBpmInput.value = bpmVal;
+            };
+
+            if (headerBpmInput) {
+                headerBpmInput.addEventListener('change', (e) => updateBpm(e.target.value));
+                headerBpmInput.addEventListener('input', (e) => updateBpm(e.target.value));
+            }
+
+            if (paramBpm) {
+                paramBpm.addEventListener('input', (e) => updateBpm(e.target.value));
+            }
+
+            // Save Project JSON
+            document.getElementById('btn-save-project').addEventListener('click', () => {
+                const projectData = {
+                    version: '1.0',
+                    bpm: state.bpm,
+                    singerMode: synth.mode,
+                    volume: synth.params.volume,
+                    vibrato: synth.params.vibrato,
+                    reverb: synth.params.reverb,
+                    notes: state.notes
+                };
+
+                const jsonStr = JSON.stringify(projectData, null, 2);
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `vocaloid_project_${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            // Open Project JSON
+            const openInput = document.getElementById('input-open-project');
+            document.getElementById('btn-open-project').addEventListener('click', () => {
+                openInput.click();
+            });
+
+            openInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const data = JSON.parse(evt.target.result);
+                        if (!data || !Array.isArray(data.notes)) {
+                            return;
+                        }
+
+                        state.notes = data.notes;
+
+                        let maxTick = 64;
+                        state.notes.forEach(n => {
+                            if (n.startTick + n.durationTicks > maxTick) {
+                                maxTick = n.startTick + n.durationTicks;
+                            }
+                        });
+                        state.totalTicks = Math.max(64, Math.ceil(maxTick / 32) * 32);
+                        updateBarCountBadge();
+
+                        if (typeof data.bpm === 'number') {
+                            state.bpm = data.bpm;
+                            synth.params.bpm = data.bpm;
+                            document.getElementById('param-bpm').value = data.bpm;
+                            document.getElementById('val-bpm').innerText = `${data.bpm}`;
+                        }
+
+                        if (data.singerMode) {
+                            synth.mode = data.singerMode;
+                            document.getElementById('singer-mode').value = data.singerMode;
+                        }
+
+                        if (typeof data.volume === 'number') {
+                            synth.params.volume = data.volume;
+                            if (synth.masterGain) synth.masterGain.gain.value = data.volume;
+                            document.getElementById('param-volume').value = data.volume;
+                            document.getElementById('val-volume').innerText = `${Math.round(data.volume * 100)}%`;
+                        }
+
+                        if (typeof data.vibrato === 'number') {
+                            synth.params.vibrato = data.vibrato;
+                            document.getElementById('param-vibrato').value = data.vibrato;
+                            document.getElementById('val-vibrato').innerText = `${Math.round(data.vibrato * 100)}%`;
+                        }
+
+                        if (typeof data.reverb === 'number') {
+                            synth.params.reverb = data.reverb;
+                            if (synth.dryGain && synth.reverbGain) {
+                                synth.dryGain.gain.value = 1.0 - data.reverb * 0.5;
+                                synth.reverbGain.gain.value = data.reverb;
+                            }
+                            document.getElementById('param-reverb').value = data.reverb;
+                            document.getElementById('val-reverb').innerText = `${Math.round(data.reverb * 100)}%`;
+                        }
+
+                        closeNoteModal();
+                        drawGrid();
+                        drawRuler();
+                        e.target.value = '';
+                    } catch (err) {}
+                };
+                reader.readAsText(file);
+            });
+
+            document.getElementById('btn-export-wav').addEventListener('click', async () => {
+                if (state.notes.length === 0 && !state.audioTrackBuffer) {
+                    return;
+                }
+
+                const exportBtn = document.getElementById('btn-export-wav');
+                const originalText = exportBtn.innerHTML;
+                exportBtn.disabled = true;
+                exportBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 書き出し中...';
+
+                try {
+                    const secondsPerTick = (60 / state.bpm) / 4;
+
+                    let maxTick = 0;
+                    state.notes.forEach(n => {
+                        if (n.startTick + n.durationTicks > maxTick) {
+                            maxTick = n.startTick + n.durationTicks;
+                        }
+                    });
+
+                    let totalDuration = maxTick * secondsPerTick + 2.0;
+                    if (state.audioTrackBuffer) {
+                        totalDuration = Math.max(totalDuration, state.audioTrackBuffer.duration + 1.0);
+                    }
+                    totalDuration = Math.max(totalDuration, 2.0);
+
+                    const sampleRate = 44100;
+                    const offlineCtx = new OfflineAudioContext(2, Math.ceil(sampleRate * totalDuration), sampleRate);
+                    
+                    const offlineSynth = new VocaloidSynthEngine();
+                    offlineSynth.ctx = offlineCtx;
+                    offlineSynth.isInit = true;
+                    offlineSynth.mode = synth.mode;
+                    offlineSynth.sampleBuffers = synth.sampleBuffers;
+                    offlineSynth.voicebanks = synth.voicebanks;
+                    offlineSynth.params = { ...synth.params };
+
+                    offlineSynth.masterGain = offlineCtx.createGain();
+                    offlineSynth.masterGain.gain.value = offlineSynth.params.volume;
+
+                    offlineSynth.reverbNode = offlineCtx.createConvolver();
+                    offlineSynth.reverbNode.buffer = offlineSynth.createImpulseResponse(1.8, 2.0);
+
+                    offlineSynth.dryGain = offlineCtx.createGain();
+                    offlineSynth.reverbGain = offlineCtx.createGain();
+
+                    offlineSynth.dryGain.gain.value = 1.0 - offlineSynth.params.reverb * 0.5;
+                    offlineSynth.reverbGain.gain.value = offlineSynth.params.reverb;
+
+                    offlineSynth.masterGain.connect(offlineSynth.dryGain);
+                    offlineSynth.dryGain.connect(offlineCtx.destination);
+
+                    offlineSynth.masterGain.connect(offlineSynth.reverbNode);
+                    offlineSynth.reverbNode.connect(offlineSynth.reverbGain);
+                    offlineSynth.reverbGain.connect(offlineCtx.destination);
+
+                    if (state.audioTrackBuffer) {
+                        const trackSource = offlineCtx.createBufferSource();
+                        trackSource.buffer = state.audioTrackBuffer;
+                        const trackGain = offlineCtx.createGain();
+                        const volVal = parseFloat(document.getElementById('param-audio-vol')?.value || 0.7);
+                        trackGain.gain.value = volVal;
+                        trackSource.connect(trackGain);
+                        trackGain.connect(offlineCtx.destination);
+                        trackSource.start(0);
+                    }
+
+                    state.notes.forEach(note => {
+                        const noteStartTime = note.startTick * secondsPerTick;
+                        const noteDuration = note.durationTicks * secondsPerTick;
+                        const effectiveLyric = getEffectiveLyric(note, state.notes);
+                        offlineSynth.playNote(note.pitch, noteDuration, effectiveLyric, noteStartTime, note.lyric);
+                    });
+
+                    const renderedBuffer = await offlineCtx.startRendering();
+                    const wavBlob = audioBufferToWav(renderedBuffer);
+
+                    // FIXED: Correct element creation and download trigger
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `vocaloid_song_${Date.now()}.wav`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (err) {
+                    console.error('WAV export error:', err);
+                } finally {
+                    exportBtn.disabled = false;
+                    exportBtn.innerHTML = originalText;
+                }
+            });
+
+            // Initialize Canvases and Keyboard
+            initPianoKeys();
+            resizeCanvases();
+
+            window.addEventListener('resize', resizeCanvases);
+        };
+    </script>
+</body>
+</html>

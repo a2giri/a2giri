@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ja" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WordCraft Studio Pro - Web Word Processor</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            word: {
+              50: '#f0f4f9',
+              100: '#dce5f3',
+              500: '#106ebe',
+              600: '#005a9e',
+              700: '#004578',
+              800: '#00335a',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans JP', 'sans-serif'],
+            serif: ['Noto Serif JP', 'serif'],
+            mono: ['Roboto Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    /* Paper Page Simulation */
+    .paper-sheet {
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s ease;
+      min-height: 1123px; /* A4 Ratio Height at standard scale */
+      width: 794px; /* A4 Ratio Width */
+      background: #ffffff;
+      position: relative;
+    }
+
+    /* Editor typography & table styling inside contentEditable */
+    #editor {
+      outline: none;
+      min-height: 1000px;
+      word-wrap: break-word;
+    }
+
+    #editor table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1em 0;
+    }
+
+    #editor table td, #editor table th {
+      border: 1px solid #cbd5e1;
+      padding: 8px 12px;
+      min-width: 40px;
+    }
+
+    #editor table th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+    }
+
+    #editor img {
+      max-width: 100%;
+      height: auto;
+      display: inline-block;
+      border-radius: 4px;
+    }
+
+    #editor blockquote {
+      border-left: 4px solid #106ebe;
+      padding-left: 1rem;
+      margin: 1rem 0;
+      color: #475569;
+      font-style: italic;
+    }
+
+    #editor hr {
+      border: none;
+      border-top: 2px solid #e2e8f0;
+      margin: 1.5rem 0;
+    }
+
+    /* Comment annotation styling */
+    .editor-comment {
+      background-color: #fef08a;
+      border-bottom: 2px solid #eab308;
+      cursor: pointer;
+    }
+
+    /* Focus Mode UI overrides */
+    body.focus-mode .no-print {
+      display: none !important;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .paper-container {
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .paper-sheet {
+        box-shadow: none !important;
+        margin: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+      }
+    }
+
+    /* Ruler ticks */
+    .ruler-tick {
+      position: absolute;
+      bottom: 0;
+      border-left: 1px solid #94a3b8;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased select-none dark:bg-slate-900 dark:text-slate-100">
+
+  <!-- Header / Top Bar -->
+  <header class="no-print bg-word-700 text-white flex items-center justify-between px-4 py-2 shrink-0 shadow-md">
+    <div class="flex items-center space-x-3">
+      <div class="bg-white text-word-700 p-1.5 rounded-lg shadow-inner flex items-center justify-center font-bold">
+        <i class="fa-solid font-bold text-lg fa-file-word"></i>
+      </div>
+      <div>
+        <input id="doc-title" type="text" value="無題のドキュメント" 
+          class="bg-transparent hover:bg-word-600 focus:bg-white focus:text-slate-900 px-2 py-0.5 rounded font-semibold text-sm transition outline-none border border-transparent focus:border-blue-400" 
+          title="クリックしてドキュメント名を編集">
+        <span class="text-xs text-blue-200 block px-2" id="save-status"><i class="fa-solid fa-cloud-check mr-1"></i>自動保存済み</span>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-2 text-xs">
+      <button onclick="createNewDocument()" class="hover:bg-word-600 px-3 py-1.5 rounded flex items-center space-x-1 transition" title="新規ドキュメント">
+        <i class="fa-solid fa-file-circle-plus"></i>
+        <span class="hidden sm:inline">新規</span>
+      </button>
+      <button onclick="triggerOpenFile()" class="hover:bg-word-600 px-3 py-1.5 rounded flex items-center space-x-1 transition" title="ファイルを開く">
+        <i class="fa-solid fa-folder-open"></i>
+        <span class="hidden sm:inline">開く</span>
+      </button>
+      <button onclick="exportHTML()" class="hover:bg-word-600 px-3 py-1.5 rounded flex items-center space-x-1 transition" title="HTML保存">
+        <i class="fa-solid fa-download"></i>
+        <span class="hidden sm:inline">保存</span>
+      </button>
+      <button onclick="window.print()" class="bg-word-500 hover:bg-word-600 px-3 py-1.5 rounded font-medium flex items-center space-x-1 shadow transition" title="印刷 / PDFへ出力">
+        <i class="fa-solid fa-print"></i>
+        <span>印刷 / PDF</span>
+      </button>
+      <input type="file" id="file-input" class="hidden" accept=".html,.txt" onchange="handleFileOpen(event)">
+      
+      <div class="h-4 w-px bg-word-500 mx-1"></div>
+
+      <button onclick="toggleDarkMode()" class="hover:bg-word-600 p-1.5 rounded-full transition" title="ダークモード切替">
+        <i class="fa-solid fa-moon text-sm" id="dark-icon"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Ribbon Toolbar Container -->
+  <div class="no-print bg-slate-200 dark:bg-slate-800 border-b border-slate-300 dark:border-slate-700 shrink-0">
+    <!-- Ribbon Tabs -->
+    <div class="flex bg-slate-300 dark:bg-slate-800 px-2 text-xs font-medium border-b border-slate-300 dark:border-slate-700">
+      <button onclick="switchTab('home', this)" class="ribbon-tab active-tab bg-white dark:bg-slate-900 text-word-600 dark:text-blue-400 px-4 py-1.5 rounded-t font-semibold border-t-2 border-word-600">ホーム</button>
+      <button onclick="switchTab('insert', this)" class="ribbon-tab hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-1.5 rounded-t text-slate-700 dark:text-slate-300">挿入</button>
+      <button onclick="switchTab('layout', this)" class="ribbon-tab hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-1.5 rounded-t text-slate-700 dark:text-slate-300">レイアウト</button>
+      <button onclick="switchTab('review', this)" class="ribbon-tab hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-1.5 rounded-t text-slate-700 dark:text-slate-300">校閲 / ツール</button>
+      <button onclick="switchTab('view', this)" class="ribbon-tab hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-1.5 rounded-t text-slate-700 dark:text-slate-300">表示</button>
+    </div>
+
+    <!-- Ribbon Action Panels -->
+    <div class="bg-white dark:bg-slate-900 px-3 py-1.5 shadow-sm min-h-[48px] flex items-center overflow-x-auto whitespace-nowrap">
+      
+      <!-- HOME TAB -->
+      <div id="tab-home" class="ribbon-panel flex items-center space-x-3 text-slate-700 dark:text-slate-200 text-xs whitespace-nowrap">
+        
+        <!-- Undo / Redo -->
+        <div class="flex flex-col items-center justify-center pr-3 border-r border-slate-200 dark:border-slate-700 shrink-0">
+          <div class="flex space-x-1">
+            <button onclick="execCmd('undo')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded" title="元に戻す (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+            <button onclick="execCmd('redo')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded" title="やり直し (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+          </div>
+          <span class="text-[9px] text-slate-400 mt-0.5">履歴</span>
+        </div>
+
+        <!-- Font Family & Size -->
+        <div class="flex flex-col space-y-1 pr-3 border-r border-slate-200 dark:border-slate-700 shrink-0">
+          <div class="flex items-center space-x-1">
+            <select id="font-name" onchange="execCmd('fontName', this.value)" class="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs outline-none">
+              <option value="Inter, Noto Sans JP, sans-serif">ゴシック (標準)</option>
+              <option value="Noto Serif JP, serif">明朝体 (Serif)</option>
+              <option value="Arial">Arial</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Roboto Mono, monospace">等幅 (Monospace)</option>
+            </select>
+            <select id="font-size" onchange="changeFontSize(this.value)" class="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs outline-none">
+              <option value="1">10pt</option>
+              <option value="2">12pt</option>
+              <option value="3" selected>14pt</option>
+              <option value="4">18pt</option>
+              <option value="5">24pt</option>
+              <option value="6">36pt</option>
+              <option value="7">48pt</option>
+            </select>
+          </div>
+          <!-- Styling Toggles -->
+          <div class="flex items-center space-x-0.5">
+            <button onclick="execCmd('bold')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded font-bold w-5 h-5 flex items-center justify-center text-xs" title="太字 (Ctrl+B)">B</button>
+            <button onclick="execCmd('italic')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded italic w-5 h-5 flex items-center justify-center text-xs" title="斜体 (Ctrl+I)">I</button>
+            <button onclick="execCmd('underline')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded underline w-5 h-5 flex items-center justify-center text-xs" title="下線 (Ctrl+U)">U</button>
+            <button onclick="execCmd('strikeThrough')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded line-through w-5 h-5 flex items-center justify-center text-xs" title="取り消し線">S</button>
+            <button onclick="execCmd('subscript')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-[9px] w-5 h-5 flex items-center justify-center" title="下付き">X<sub>2</sub></button>
+            <button onclick="execCmd('superscript')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-[9px] w-5 h-5 flex items-center justify-center" title="上付き">X<sup>2</sup></button>
+            <!-- Color Pickers -->
+            <label class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer w-5 h-5 flex items-center justify-center relative" title="文字の色">
+              <i class="fa-solid fa-font text-red-500 text-xs"></i>
+              <input type="color" onchange="execCmd('foreColor', this.value)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+            </label>
+            <label class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer w-5 h-5 flex items-center justify-center relative" title="ハイライトの色">
+              <i class="fa-solid fa-highlighter text-yellow-500 text-xs"></i>
+              <input type="color" value="#fef08a" onchange="execCmd('hiliteColor', this.value)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+            </label>
+            <button onclick="execCmd('removeFormat')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 w-5 h-5 flex items-center justify-center text-xs" title="書式のクリア"><i class="fa-solid fa-eraser"></i></button>
+          </div>
+        </div>
+
+        <!-- Paragraph Settings -->
+        <div class="flex flex-col space-y-1 pr-3 border-r border-slate-200 dark:border-slate-700 shrink-0">
+          <div class="flex items-center space-x-0.5">
+            <button onclick="execCmd('justifyLeft')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="左揃え"><i class="fa-solid fa-align-left"></i></button>
+            <button onclick="execCmd('justifyCenter')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="中央揃え"><i class="fa-solid fa-align-center"></i></button>
+            <button onclick="execCmd('justifyRight')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="右揃え"><i class="fa-solid fa-align-right"></i></button>
+            <button onclick="execCmd('justifyFull')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="両端揃え"><i class="fa-solid fa-align-justify"></i></button>
+            <div class="w-px h-3 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+            <button onclick="execCmd('insertUnorderedList')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
+            <button onclick="execCmd('insertOrderedList')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="番号付きリスト"><i class="fa-solid fa-list-ol"></i></button>
+          </div>
+          <div class="flex items-center space-x-0.5">
+            <button onclick="execCmd('outdent')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="インデント解除"><i class="fa-solid fa-outdent"></i></button>
+            <button onclick="execCmd('indent')" class="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded w-5 h-5 flex items-center justify-center text-xs" title="インデント増"><i class="fa-solid fa-indent"></i></button>
+            <!-- Line spacing dropdown -->
+            <select onchange="changeLineSpacing(this.value)" class="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[10px] outline-none ml-1" title="行間">
+              <option value="1.0">行間 1.0</option>
+              <option value="1.15" selected>行間 1.15</option>
+              <option value="1.5">行間 1.5</option>
+              <option value="2.0">行間 2.0</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Heading Quick Styles -->
+        <div class="flex items-center space-x-1 pr-3 border-r border-slate-200 dark:border-slate-700 shrink-0">
+          <button onclick="applyHeading('p')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded text-xs whitespace-nowrap">標準</button>
+          <button onclick="applyHeading('h1')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded text-xs font-bold text-blue-700 dark:text-blue-400 whitespace-nowrap">見出し 1</button>
+          <button onclick="applyHeading('h2')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded text-xs font-semibold text-blue-600 dark:text-blue-300 whitespace-nowrap">見出し 2</button>
+          <button onclick="applyHeading('h3')" class="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 rounded text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">見出し 3</button>
+        </div>
+
+        <!-- Search & Find -->
+        <div class="flex items-center justify-center shrink-0">
+          <button onclick="openFindReplaceModal()" class="px-2.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex items-center space-x-1 text-slate-700 dark:text-slate-200 whitespace-nowrap">
+            <i class="fa-solid fa-magnifying-glass text-word-600"></i>
+            <span>検索・置換</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- INSERT TAB -->
+      <div id="tab-insert" class="ribbon-panel hidden flex items-center space-x-3 text-slate-700 dark:text-slate-200 text-xs whitespace-nowrap">
+        
+        <!-- Insert Table -->
+        <button onclick="openTableModal()" class="flex items-center space-x-1.5 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-table text-word-600 text-base"></i>
+          <span>表の挿入</span>
+        </button>
+
+        <!-- Insert Image -->
+        <button onclick="openImageModal()" class="flex items-center space-x-1.5 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-image text-emerald-600 text-base"></i>
+          <span>画像</span>
+        </button>
+
+        <!-- Horizontal Divider & Page Break -->
+        <div class="flex space-x-1 shrink-0">
+          <button onclick="execCmd('insertHorizontalRule')" class="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex items-center space-x-1 text-xs">
+            <i class="fa-solid fa-minus text-slate-500"></i>
+            <span>水平線</span>
+          </button>
+          <button onclick="insertPageBreak()" class="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded flex items-center space-x-1 text-xs">
+            <i class="fa-solid fa-scissors text-slate-500"></i>
+            <span>改ページ区切り</span>
+          </button>
+        </div>
+
+        <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+
+        <!-- Special Blocks -->
+        <button onclick="insertBlockquote()" class="flex items-center space-x-1.5 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-quote-left text-amber-600 text-base"></i>
+          <span>引用ブロック</span>
+        </button>
+
+        <button onclick="insertCallout()" class="flex items-center space-x-1.5 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-note-sticky text-indigo-600 text-base"></i>
+          <span>補足メモ</span>
+        </button>
+
+        <!-- Hyperlink & Comment -->
+        <button onclick="openLinkModal()" class="flex items-center space-x-1.5 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-link text-blue-500 text-base"></i>
+          <span>リンク</span>
+        </button>
+
+        <button onclick="addComment()" class="flex items-center space-x-1.5 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-comment-medical text-purple-600 text-base"></i>
+          <span>コメント追加</span>
+        </button>
+
+      </div>
+
+      <!-- LAYOUT TAB -->
+      <div id="tab-layout" class="ribbon-panel hidden flex items-center space-x-4 text-slate-700 dark:text-slate-200 text-xs whitespace-nowrap">
+        
+        <!-- Page Margins -->
+        <div class="flex items-center space-x-1.5 shrink-0">
+          <label class="text-xs text-slate-500 font-medium">余白:</label>
+          <select onchange="changeMargins(this.value)" class="bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 outline-none text-xs">
+            <option value="normal">標準 (25mm)</option>
+            <option value="narrow">狭い (12mm)</option>
+            <option value="wide">広い (38mm)</option>
+          </select>
+        </div>
+
+        <!-- Page Orientation -->
+        <div class="flex items-center space-x-1 shrink-0">
+          <span class="text-xs text-slate-500 font-medium mr-1">向き:</span>
+          <button onclick="setOrientation('portrait')" id="btn-portrait" class="px-2 py-1 bg-word-100 text-word-700 dark:bg-word-800 dark:text-blue-200 rounded font-medium text-xs">縦向き</button>
+          <button onclick="setOrientation('landscape')" id="btn-landscape" class="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-xs">横向き</button>
+        </div>
+
+        <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+
+        <!-- Page Color & Watermark -->
+        <div class="flex items-center space-x-2 shrink-0">
+          <label class="flex items-center space-x-1 cursor-pointer px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
+            <i class="fa-solid fa-palette text-pink-500 text-sm"></i>
+            <span>背景色</span>
+            <input type="color" value="#ffffff" onchange="changePaperColor(this.value)" class="sr-only">
+          </label>
+
+          <button onclick="toggleWatermark()" class="flex items-center space-x-1 px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded">
+            <i class="fa-solid fa-stamp text-slate-500 text-sm"></i>
+            <span>透かし (社外秘)</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- REVIEW TAB -->
+      <div id="tab-review" class="ribbon-panel hidden flex items-center space-x-3 text-slate-700 dark:text-slate-200 text-xs whitespace-nowrap">
+        
+        <!-- Generate Table of Contents -->
+        <button onclick="generateTOC()" class="flex items-center space-x-1.5 px-2.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-word-600 dark:text-blue-400 shrink-0">
+          <i class="fa-solid fa-list-ol text-sm"></i>
+          <span>自動目次を挿入</span>
+        </button>
+
+        <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+
+        <!-- Speech / Dictation -->
+        <button onclick="toggleDictation()" id="dictation-btn" class="flex items-center space-x-1.5 px-2.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-microphone text-red-500 text-sm" id="mic-icon"></i>
+          <span id="mic-status">音声入力</span>
+        </button>
+
+        <button onclick="speakSelectedText()" class="flex items-center space-x-1.5 px-2.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-volume-high text-sky-500 text-sm"></i>
+          <span>テキスト読み上げ</span>
+        </button>
+
+        <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+
+        <!-- Detailed Stats -->
+        <button onclick="showWordCountModal()" class="flex items-center space-x-1.5 px-2.5 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded shrink-0">
+          <i class="fa-solid fa-calculator text-indigo-500 text-sm"></i>
+          <span>詳細な文字数統計</span>
+        </button>
+
+      </div>
+
+      <!-- VIEW TAB -->
+      <div id="tab-view" class="ribbon-panel hidden flex items-center space-x-4 text-slate-700 dark:text-slate-200 text-xs whitespace-nowrap">
+        
+        <div class="flex items-center space-x-2 shrink-0">
+          <span class="font-medium">ズーム:</span>
+          <input type="range" id="zoom-range" min="50" max="150" value="100" oninput="updateZoom(this.value)" class="w-20 accent-word-600">
+          <span id="zoom-val" class="w-10 font-mono">100%</span>
+        </div>
+
+        <div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0"></div>
+
+        <label class="flex items-center space-x-1.5 cursor-pointer shrink-0">
+          <input type="checkbox" id="toggle-ruler" checked onchange="toggleRulerDisplay(this.checked)" class="rounded text-word-600 focus:ring-word-500">
+          <span>ルーラー表示</span>
+        </label>
+
+        <button onclick="toggleFocusMode()" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded flex items-center space-x-1 shrink-0">
+          <i class="fa-solid fa-expand text-slate-600 dark:text-slate-300"></i>
+          <span>フォーカスモード</span>
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Ruler Bar -->
+  <div id="ruler-bar" class="no-print bg-slate-200 dark:bg-slate-800 border-b border-slate-300 dark:border-slate-700 h-6 flex justify-center overflow-hidden">
+    <div id="ruler-scale" class="relative bg-white dark:bg-slate-700 h-full text-[9px] text-slate-500 dark:text-slate-300 font-mono flex items-center shadow-inner" style="width: 794px;">
+      <!-- JavaScript will dynamically render millimeter ticks -->
+    </div>
+  </div>
+
+  <!-- Editor Main Area (A4 Paper View) -->
+  <main class="flex-1 overflow-auto p-8 flex justify-center bg-slate-300 dark:bg-slate-950 paper-container relative" id="main-viewport">
+    
+    <!-- A4 Paper Document Sheet -->
+    <div id="paper" class="paper-sheet rounded-sm p-16 text-slate-900 bg-white transition-all duration-150 relative">
+      
+      <!-- Watermark Overlay (Hidden by default) -->
+      <div id="watermark" class="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 transition-opacity select-none z-0">
+        <span class="text-7xl font-extrabold text-slate-300 transform -rotate-45 tracking-widest uppercase">社外秘 / CONFIDENTIAL</span>
+      </div>
+
+      <!-- Floating Exit Button for Focus Mode -->
+      <button id="focus-exit-btn" onclick="toggleFocusMode()" class="hidden fixed top-4 right-4 z-50 bg-slate-900/80 hover:bg-slate-900 text-white px-3 py-1.5 rounded-full text-xs shadow-xl backdrop-blur items-center space-x-2 border border-slate-700 transition">
+        <i class="fa-solid fa-compress"></i>
+        <span>フォーカスモード解除 (Esc)</span>
+      </button>
+
+      <!-- Header Area -->
+      <div class="text-xs text-slate-400 border-b border-slate-100 pb-2 mb-6 flex justify-between items-center select-none" contenteditable="false">
+        <span id="header-text">WordCraft Document</span>
+        <span class="text-[10px]">標準ヘッダー</span>
+      </div>
+
+      <!-- Editable Document Canvas -->
+      <div id="editor" contenteditable="true" spellcheck="true" class="relative z-10 focus:outline-none min-h-[900px] leading-relaxed">
+        <h1 class="text-3xl font-bold text-slate-900 mb-4">Web版 ワープロ ソフトウェアへようこそ</h1>
+        <p class="mb-4">このアプリケーションは、<strong>Microsoft Word</strong>のような高度な文書作成体験をブラウザ上で提供します。上のリボンメニューから多様な書式設定、表や画像の挿入、レイアウト調整を直感的に行えます。</p>
+        
+        <h2 class="text-xl font-semibold text-slate-800 mt-6 mb-2">主な機能一覧</h2>
+        <ul class="list-disc pl-6 space-y-1 mb-4">
+          <li><strong>リッチテキスト編集:</strong> フォント切替、サイズ調整、カラーパレット、太字/斜体/下線/打消し線。</li>
+          <li><strong>高度なオブジェクト:</strong> 表の挿入、画像の配置、補足コールアウト、引用ブロック。</li>
+          <li><strong>文書構造:</strong> 見出しスタイル（Heading 1〜3）を設定して、ワンクリックで目次を自動生成。</li>
+          <li><strong>校閲 & ツール:</strong> 文字数・単語数のリアルタイム計測、音声入力、テキスト読み上げ、コメント機能。</li>
+          <li><strong>印刷 & 出力:</strong> A4用紙を完全再現。ワンクリックでキレイなPDF出力・印刷が可能。</li>
+        </ul>
+
+        <blockquote class="my-4">
+          「思考を素早く形に。いつでもどこでも美しいドキュメントを。」
+        </blockquote>
+
+        <p class="text-slate-600">文字を選択して装飾を試すか、新しい段落を入力してドキュメントを作成してみましょう！</p>
+      </div>
+
+      <!-- Footer Area -->
+      <div class="text-xs text-slate-400 border-t border-slate-100 pt-4 mt-12 flex justify-between items-center select-none" contenteditable="false">
+        <span>作成日: <span id="doc-date">2026/07/27</span></span>
+        <span>Page <span id="current-page-num">1</span></span>
+      </div>
+
+    </div>
+
+    <!-- Floating Quick Formatting Toolbar for selected text -->
+    <div id="floating-toolbar" class="hidden absolute bg-slate-900 text-white rounded-lg shadow-xl p-1.5 flex items-center space-x-1 z-50 text-xs transition-opacity duration-150">
+      <button onclick="execCmd('bold')" class="p-1 hover:bg-slate-700 rounded font-bold w-6 h-6">B</button>
+      <button onclick="execCmd('italic')" class="p-1 hover:bg-slate-700 rounded italic w-6 h-6">I</button>
+      <button onclick="execCmd('underline')" class="p-1 hover:bg-slate-700 rounded underline w-6 h-6">U</button>
+      <div class="w-px h-4 bg-slate-700 mx-1"></div>
+      <button onclick="applyHeading('h1')" class="px-1.5 py-0.5 hover:bg-slate-700 rounded text-[10px]">H1</button>
+      <button onclick="applyHeading('h2')" class="px-1.5 py-0.5 hover:bg-slate-700 rounded text-[10px]">H2</button>
+      <button onclick="addComment()" class="p-1 hover:bg-slate-700 rounded text-yellow-400" title="コメント"><i class="fa-solid fa-comment"></i></button>
+    </div>
+
+  </main>
+
+  <!-- Bottom Status Bar -->
+  <footer class="no-print bg-slate-200 dark:bg-slate-800 border-t border-slate-300 dark:border-slate-700 px-4 py-1 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 shrink-0">
+    <div class="flex items-center space-x-4">
+      <span>ページ 1 / 1</span>
+      <span>単語数: <strong id="word-count">0</strong></span>
+      <span>文字数: <strong id="char-count">0</strong> (スペース除く: <strong id="char-no-space-count">0</strong>)</span>
+      <span class="hidden md:inline text-slate-400">| 読了予測: 約 <span id="read-time">1</span> 分</span>
+    </div>
+
+    <div class="flex items-center space-x-3">
+      <span id="dictation-indicator" class="hidden text-red-500 font-semibold animate-pulse"><i class="fa-solid fa-circle text-[8px] mr-1"></i>音声録音中...</span>
+      <span>日本語</span>
+      <div class="h-3 w-px bg-slate-400"></div>
+      <span id="zoom-status">100%</span>
+    </div>
+  </footer>
+
+  <!-- MODAL: Table Inserter -->
+  <div id="modal-table" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm text-slate-800 dark:text-slate-100">
+      <h3 class="text-base font-bold mb-4 flex items-center space-x-2">
+        <i class="fa-solid fa-table text-word-600"></i>
+        <span>表の挿入</span>
+      </h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold mb-1">行数 (Rows):</label>
+          <input type="number" id="table-rows" value="3" min="1" max="20" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded px-3 py-1.5 text-sm outline-none focus:border-word-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">列数 (Columns):</label>
+          <input type="number" id="table-cols" value="3" min="1" max="10" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded px-3 py-1.5 text-sm outline-none focus:border-word-500">
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end space-x-2">
+        <button onclick="closeModal('modal-table')" class="px-4 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-slate-700">キャンセル</button>
+        <button onclick="insertTable()" class="px-4 py-1.5 text-xs bg-word-600 hover:bg-word-700 text-white font-medium rounded shadow">挿入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Image Inserter -->
+  <div id="modal-image" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md text-slate-800 dark:text-slate-100">
+      <h3 class="text-base font-bold mb-4 flex items-center space-x-2">
+        <i class="fa-solid fa-image text-emerald-600"></i>
+        <span>画像の挿入</span>
+      </h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold mb-1">画像ファイルを選択:</label>
+          <input type="file" id="img-file" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-word-50 file:text-word-700 hover:file:bg-word-100">
+        </div>
+        <div class="text-center text-xs text-slate-400 font-semibold">または</div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">画像URLを入力:</label>
+          <input type="text" id="img-url" placeholder="https://images.unsplash.com/..." class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded px-3 py-1.5 text-sm outline-none focus:border-word-500">
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end space-x-2">
+        <button onclick="closeModal('modal-image')" class="px-4 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-slate-700">キャンセル</button>
+        <button onclick="insertImage()" class="px-4 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded shadow">挿入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Find and Replace -->
+  <div id="modal-find" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md text-slate-800 dark:text-slate-100">
+      <h3 class="text-base font-bold mb-4 flex items-center space-x-2">
+        <i class="fa-solid fa-magnifying-glass text-word-600"></i>
+        <span>検索と置換</span>
+      </h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold mb-1">検索する文字列:</label>
+          <input type="text" id="find-query" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded px-3 py-1.5 text-sm outline-none focus:border-word-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">置換後の文字列:</label>
+          <input type="text" id="replace-query" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded px-3 py-1.5 text-sm outline-none focus:border-word-500">
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end space-x-2">
+        <button onclick="closeModal('modal-find')" class="px-3 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-slate-700">閉じろ</button>
+        <button onclick="performReplace(false)" class="px-3 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded font-medium">1つ置換</button>
+        <button onclick="performReplace(true)" class="px-3 py-1.5 text-xs bg-word-600 hover:bg-word-700 text-white font-medium rounded shadow">すべて置換</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Insert Link -->
+  <div id="modal-link" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm text-slate-800 dark:text-slate-100">
+      <h3 class="text-base font-bold mb-4 flex items-center space-x-2">
+        <i class="fa-solid fa-link text-blue-500"></i>
+        <span>ハイパーリンクの挿入</span>
+      </h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold mb-1">URL:</label>
+          <input type="url" id="link-url" placeholder="https://example.com" class="w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-700 rounded px-3 py-1.5 text-sm outline-none focus:border-word-500">
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end space-x-2">
+        <button onclick="closeModal('modal-link')" class="px-4 py-1.5 text-xs rounded hover:bg-slate-100 dark:hover:bg-slate-700">キャンセル</button>
+        <button onclick="insertLink()" class="px-4 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium rounded shadow">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Detailed Word Statistics -->
+  <div id="modal-stats" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm text-slate-800 dark:text-slate-100">
+      <h3 class="text-base font-bold mb-4 flex items-center space-x-2 border-b pb-2 dark:border-slate-700">
+        <i class="fa-solid fa-chart-pie text-indigo-500"></i>
+        <span>文字数カウントの統計</span>
+      </h3>
+      <div class="space-y-2 text-xs">
+        <div class="flex justify-between py-1 border-b dark:border-slate-700">
+          <span class="text-slate-500">単語数:</span>
+          <span id="stat-words" class="font-bold">0</span>
+        </div>
+        <div class="flex justify-between py-1 border-b dark:border-slate-700">
+          <span class="text-slate-500">文字数 (スペース含む):</span>
+          <span id="stat-chars" class="font-bold">0</span>
+        </div>
+        <div class="flex justify-between py-1 border-b dark:border-slate-700">
+          <span class="text-slate-500">文字数 (スペース除く):</span>
+          <span id="stat-chars-nospace" class="font-bold">0</span>
+        </div>
+        <div class="flex justify-between py-1 border-b dark:border-slate-700">
+          <span class="text-slate-500">段落数:</span>
+          <span id="stat-paragraphs" class="font-bold">0</span>
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end">
+        <button onclick="closeModal('modal-stats')" class="px-4 py-1.5 text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 rounded font-medium">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Toast Notification Box -->
+  <div id="toast" class="fixed bottom-10 right-10 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-2xl text-xs flex items-center space-x-2 transition-all duration-300 transform translate-y-20 opacity-0 z-50">
+    <i class="fa-solid fa-circle-info text-blue-400" id="toast-icon"></i>
+    <span id="toast-msg">通知メッセージ</span>
+  </div>
+
+  <script>
+    const editor = document.getElementById('editor');
+    const paper = document.getElementById('paper');
+    const docTitleInput = document.getElementById('doc-title');
+    const saveStatus = document.getElementById('save-status');
+    const floatingToolbar = document.getElementById('floating-toolbar');
+    
+    let isDictating = false;
+    let recognition = null;
+
+    // Load initial date
+    document.getElementById('doc-date').innerText = new Date().toLocaleDateString('ja-JP');
+
+    // Initialize Ruler Ticks
+    function initRuler() {
+      const rulerScale = document.getElementById('ruler-scale');
+      rulerScale.innerHTML = '';
+      const totalMm = 210; // A4 Width in mm approx
+      for (let i = 0; i <= totalMm; i += 10) {
+        const tick = document.createElement('div');
+        tick.className = 'ruler-tick';
+        tick.style.left = `${(i / totalMm) * 100}%`;
+        tick.style.height = i % 50 === 0 ? '60%' : '35%';
+        if (i % 50 === 0 && i !== 0) {
+          const num = document.createElement('span');
+          num.className = 'absolute -top-3 -left-2 text-[8px]';
+          num.innerText = i / 10 + 'cm';
+          tick.appendChild(num);
+        }
+        rulerScale.appendChild(tick);
+      }
+    }
+    initRuler();
+
+    function execCmd(command, value = null) {
+      document.execCommand(command, false, value);
+      editor.focus();
+      updateStats();
+      triggerAutoSave();
+    }
+
+    function changeFontSize(sizeVal) {
+      execCmd('fontSize', sizeVal);
+    }
+
+    function changeLineSpacing(val) {
+      editor.style.lineHeight = val;
+      showToast(`行間を ${val} に設定しました`);
+    }
+
+    function applyHeading(tag) {
+      execCmd('formatBlock', `<${tag}>`);
+    }
+
+    function switchTab(tabId, btnEl) {
+      // 全タブボタンのハイライトを初期化
+      document.querySelectorAll('.ribbon-tab').forEach(tab => {
+        tab.classList.remove('bg-white', 'dark:bg-slate-900', 'text-word-600', 'dark:text-blue-400', 'border-t-2', 'border-word-600', 'font-semibold');
+        tab.classList.add('text-slate-700', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-700');
+      });
+
+      // 選択されたタブボタンをハイライト状態にする
+      if (btnEl) {
+        btnEl.classList.remove('text-slate-700', 'dark:text-slate-300', 'hover:bg-slate-200', 'dark:hover:bg-slate-700');
+        btnEl.classList.add('bg-white', 'dark:bg-slate-900', 'text-word-600', 'dark:text-blue-400', 'border-t-2', 'border-word-600', 'font-semibold');
+      }
+
+      // 全パネルを非表示にする
+      document.querySelectorAll('.ribbon-panel').forEach(panel => {
+        panel.classList.add('hidden');
+      });
+
+      // 対象のパネルのみ非表示（hidden）を解除して表示する
+      const activePanel = document.getElementById(`tab-${tabId}`);
+      if (activePanel) {
+        activePanel.classList.remove('hidden');
+      }
+    }
+
+    function openTableModal() { document.getElementById('modal-table').classList.remove('hidden'); }
+    function openImageModal() { document.getElementById('modal-image').classList.remove('hidden'); }
+    function openFindReplaceModal() { document.getElementById('modal-find').classList.remove('hidden'); }
+    function openLinkModal() { document.getElementById('modal-link').classList.remove('hidden'); }
+    
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function insertTable() {
+      const rows = parseInt(document.getElementById('table-rows').value) || 3;
+      const cols = parseInt(document.getElementById('table-cols').value) || 3;
+
+      let html = '<table class="my-4 border-collapse w-full"><tbody>';
+      for (let r = 0; r < rows; r++) {
+        html += '<tr>';
+        for (let c = 0; c < cols; c++) {
+          html += `<td class="border border-slate-300 p-2">${r === 0 ? '<strong>ヘッダー</strong>' : 'データ'}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table><p><br></p>';
+
+      execCmd('insertHTML', html);
+      closeModal('modal-table');
+      showToast('表を挿入しました');
+    }
+
+    function insertImage() {
+      const fileInput = document.getElementById('img-file');
+      const urlInput = document.getElementById('img-url').value;
+
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          execCmd('insertHTML', `<img src="${e.target.result}" alt="画像" class="my-4 rounded shadow-md max-w-full"><p><br></p>`);
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else if (urlInput) {
+        execCmd('insertHTML', `<img src="${urlInput}" alt="画像" class="my-4 rounded shadow-md max-w-full"><p><br></p>`);
+      }
+      closeModal('modal-image');
+      showToast('画像を挿入しました');
+    }
+
+    function insertBlockquote() {
+      const html = '<blockquote class="border-l-4 border-word-500 pl-4 py-1 italic my-4 text-slate-600">ここに引用文を入力...</blockquote><p><br></p>';
+      execCmd('insertHTML', html);
+    }
+
+    function insertCallout() {
+      const html = '<div class="bg-blue-50 border-l-4 border-blue-500 p-4 my-4 rounded-r shadow-sm text-blue-900"><strong class="block font-bold mb-1"><i class="fa-solid fa-circle-info mr-1"></i> 補足ノート</strong>ここに重要な説明を入力します。</div><p><br></p>';
+      execCmd('insertHTML', html);
+    }
+
+    function insertPageBreak() {
+      const html = '<div class="my-8 border-b-2 border-dashed border-red-300 text-center text-xs text-red-400 select-none py-1">--- 改ページ (Page Break) ---</div><p><br></p>';
+      execCmd('insertHTML', html);
+    }
+
+    function insertLink() {
+      const url = document.getElementById('link-url').value;
+      if (url) {
+        execCmd('createLink', url);
+      }
+      closeModal('modal-link');
+    }
+
+    function addComment() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount || sel.isCollapsed) {
+        showToast('コメントを付けるテキストを選択してください');
+        return;
+      }
+      const commentText = prompt('コメントを入力:');
+      if (commentText) {
+        const span = document.createElement('span');
+        span.className = 'editor-comment relative group';
+        span.title = `コメント: ${commentText}`;
+        span.innerText = sel.toString();
+        
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(span);
+        showToast('コメントを追加しました');
+      }
+    }
+
+    function generateTOC() {
+      const headings = editor.querySelectorAll('h1, h2, h3');
+      if (headings.length === 0) {
+        showToast('目次を作成するための見出し(H1~H3)が見つかりません');
+        return;
+      }
+
+      let tocHtml = '<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 my-4 select-none"><h3 class="font-bold text-base mb-2 border-b pb-1 text-word-700">目次 (Table of Contents)</h3><ul class="space-y-1 text-xs">';
+      headings.forEach((h, idx) => {
+        const id = 'heading-toc-' + idx;
+        h.id = id;
+        const level = h.tagName.toLowerCase();
+        const indent = level === 'h1' ? '' : level === 'h2' ? 'ml-4' : 'ml-8';
+        tocHtml += `<li class="${indent}"><a href="#${id}" onclick="document.getElementById('${id}').scrollIntoView({behavior:'smooth'}); return false;" class="text-blue-600 dark:text-blue-400 hover:underline">${h.innerText}</a></li>`;
+      });
+      tocHtml += '</ul></div><p><br></p>';
+
+      editor.insertAdjacentHTML('afterbegin', tocHtml);
+      showToast('目次を自動生成しました');
+    }
+
+    function performReplace(replaceAll) {
+      const findText = document.getElementById('find-query').value;
+      const replaceText = document.getElementById('replace-query').value;
+
+      if (!findText) return;
+
+      const content = editor.innerHTML;
+      if (replaceAll) {
+        const regex = new RegExp(findText, 'g');
+        editor.innerHTML = content.replace(regex, replaceText);
+        showToast('すべての対象を置換しました');
+      } else {
+        editor.innerHTML = content.replace(findText, replaceText);
+        showToast('最初に見つかった対象を置換しました');
+      }
+      closeModal('modal-find');
+      updateStats();
+    }
+
+    function toggleDictation() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showToast('お使いのブラウザは音声入力に対応していません');
+        return;
+      }
+
+      if (isDictating) {
+        recognition.stop();
+        isDictating = false;
+        document.getElementById('dictation-indicator').classList.add('hidden');
+        document.getElementById('mic-status').innerText = '音声入力';
+        showToast('音声入力を停止しました');
+      } else {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onresult = (event) => {
+          const transcript = event.results[event.results.length - 1][0].transcript;
+          execCmd('insertText', transcript);
+        };
+
+        recognition.start();
+        isDictating = true;
+        document.getElementById('dictation-indicator').classList.remove('hidden');
+        document.getElementById('mic-status').innerText = '停止';
+        showToast('音声入力を開始しました（お話しください）');
+      }
+    }
+
+    function speakSelectedText() {
+      const text = window.getSelection().toString() || editor.innerText;
+      if (!text) return;
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      window.speechSynthesis.speak(utterance);
+      showToast('テキストを読み上げています...');
+    }
+
+    function changeMargins(type) {
+      if (type === 'narrow') {
+        paper.style.padding = '2rem';
+      } else if (type === 'wide') {
+        paper.style.padding = '6rem';
+      } else {
+        paper.style.padding = '4rem'; // Normal
+      }
+      showToast(`余白を「${type}」に変更しました`);
+    }
+
+    function setOrientation(mode) {
+      const btnP = document.getElementById('btn-portrait');
+      const btnL = document.getElementById('btn-landscape');
+
+      if (mode === 'landscape') {
+        paper.style.width = '1123px';
+        paper.style.minHeight = '794px';
+        btnL.className = 'px-2 py-1 bg-word-100 text-word-700 dark:bg-word-800 dark:text-blue-200 rounded font-medium';
+        btnP.className = 'px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded';
+      } else {
+        paper.style.width = '794px';
+        paper.style.minHeight = '1123px';
+        btnP.className = 'px-2 py-1 bg-word-100 text-word-700 dark:bg-word-800 dark:text-blue-200 rounded font-medium';
+        btnL.className = 'px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded';
+      }
+      initRuler();
+    }
+
+    function changePaperColor(color) {
+      paper.style.backgroundColor = color;
+    }
+
+    function toggleWatermark() {
+      const wm = document.getElementById('watermark');
+      if (wm.classList.contains('opacity-0')) {
+        wm.classList.remove('opacity-0');
+        wm.classList.add('opacity-20');
+        showToast('透かしを表示しました');
+      } else {
+        wm.classList.remove('opacity-20');
+        wm.classList.add('opacity-0');
+        showToast('透かしを非表示にしました');
+      }
+    }
+
+    function updateZoom(val) {
+      paper.style.transform = `scale(${val / 100})`;
+      paper.style.transformOrigin = 'top center';
+      document.getElementById('zoom-val').innerText = val + '%';
+      document.getElementById('zoom-status').innerText = val + '%';
+    }
+
+    function toggleRulerDisplay(visible) {
+      document.getElementById('ruler-bar').style.display = visible ? 'flex' : 'none';
+    }
+
+    function toggleFocusMode() {
+      const isFocus = document.body.classList.toggle('focus-mode');
+      const exitBtn = document.getElementById('focus-exit-btn');
+
+      if (isFocus) {
+        if (exitBtn) {
+          exitBtn.classList.remove('hidden');
+          exitBtn.classList.add('flex');
+        }
+        showToast('フォーカスモードを有効にしました（Escキーで解除）');
+
+        // Safely attempt browser fullscreen and catch any Permission Policy rejections
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {
+            // Fallback gracefully to UI-based Focus Mode if fullscreen API is blocked
+          });
+        }
+      } else {
+        if (exitBtn) {
+          exitBtn.classList.add('hidden');
+          exitBtn.classList.remove('flex');
+        }
+        showToast('フォーカスモードを解除しました');
+
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    // Keyboard shortcut to exit focus mode with Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.body.classList.contains('focus-mode')) {
+        toggleFocusMode();
+      }
+    });
+
+    // Reset UI state when exiting native browser fullscreen
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && document.body.classList.contains('focus-mode')) {
+        toggleFocusMode();
+      }
+    });
+
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+      const icon = document.getElementById('dark-icon');
+      if (document.documentElement.classList.contains('dark')) {
+        icon.className = 'fa-solid fa-sun text-yellow-400';
+      } else {
+        icon.className = 'fa-solid fa-moon text-sm';
+      }
+    }
+
+    function updateStats() {
+      const text = editor.innerText || '';
+      
+      // Character counts
+      const totalChars = text.length;
+      const charsNoSpace = text.replace(/\s/g, '').length;
+      
+      // Word calculation (Japanese & English hybrid)
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      
+      // Paragraph count
+      const paragraphs = text.split(/\n+/).filter(p => p.trim().length > 0).length;
+
+      document.getElementById('word-count').innerText = words;
+      document.getElementById('char-count').innerText = totalChars;
+      document.getElementById('char-no-space-count').innerText = charsNoSpace;
+      document.getElementById('read-time').innerText = Math.max(1, Math.ceil(charsNoSpace / 500));
+
+      // Modal Stats
+      document.getElementById('stat-words').innerText = words;
+      document.getElementById('stat-chars').innerText = totalChars;
+      document.getElementById('stat-chars-nospace').innerText = charsNoSpace;
+      document.getElementById('stat-paragraphs').innerText = paragraphs;
+    }
+
+    function showWordCountModal() {
+      updateStats();
+      document.getElementById('modal-stats').classList.remove('hidden');
+    }
+
+    function triggerAutoSave() {
+      saveStatus.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-1"></i>保存中...';
+      localStorage.setItem('wordcraft_doc_title', docTitleInput.value);
+      localStorage.setItem('wordcraft_doc_content', editor.innerHTML);
+      setTimeout(() => {
+        saveStatus.innerHTML = '<i class="fa-solid fa-cloud-check mr-1"></i>自動保存済み';
+      }, 500);
+    }
+
+    function loadSavedDocument() {
+      const savedTitle = localStorage.getItem('wordcraft_doc_title');
+      const savedContent = localStorage.getItem('wordcraft_doc_content');
+      if (savedTitle) docTitleInput.value = savedTitle;
+      if (savedContent) editor.innerHTML = savedContent;
+      updateStats();
+    }
+
+    function createNewDocument() {
+      if (confirm('新しいドキュメントを作成しますか？現在の未保存の内容は上書きされます。')) {
+        docTitleInput.value = '無題のドキュメント';
+        editor.innerHTML = '<p><br></p>';
+        triggerAutoSave();
+        updateStats();
+        showToast('新規ドキュメントを作成しました');
+      }
+    }
+
+    function exportHTML() {
+      const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${docTitleInput.value}</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:auto;}</style></head><body>${editor.innerHTML}</body></html>`;
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${docTitleInput.value}.html`;
+      a.click();
+      showToast('HTMLファイルとして保存しました');
+    }
+
+    function triggerOpenFile() {
+      document.getElementById('file-input').click();
+    }
+
+    function handleFileOpen(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        editor.innerHTML = evt.target.result;
+        docTitleInput.value = file.name.replace(/\.[^/.]+$/, "");
+        triggerAutoSave();
+        updateStats();
+        showToast('ファイルを開きました');
+      };
+      reader.readAsText(file);
+    }
+
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      if (sel.isCollapsed || !editor.contains(sel.anchorNode)) {
+        floatingToolbar.classList.add('hidden');
+        return;
+      }
+
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      floatingToolbar.style.top = `${rect.top + window.scrollY - 40}px`;
+      floatingToolbar.style.left = `${rect.left + window.scrollX}px`;
+      floatingToolbar.classList.remove('hidden');
+    });
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // Input & Change Listeners
+    editor.addEventListener('input', () => {
+      updateStats();
+      triggerAutoSave();
+    });
+
+    docTitleInput.addEventListener('input', triggerAutoSave);
+
+    // Initial Load
+    window.onload = function() {
+      loadSavedDocument();
+    };
+  </script>
+</body>
+</html>

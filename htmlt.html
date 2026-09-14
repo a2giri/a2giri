@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebCraft Blocks Pro - Google Sites風Webサイトビルダー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Zen Kaku Gothic New', 'Noto Sans JP', 'Plus Jakarta Sans', sans-serif;
+            user-select: none;
+        }
+        .block-item { cursor: grab; transition: transform 0.1s ease, box-shadow 0.1s ease; position: relative; }
+        .block-item:active { cursor: grabbing; }
+        .bg-block-event { background-color: #FFBF00; color: #332200; }
+        .bg-block-ui { background-color: #9966FF; color: #FFFFFF; }
+        .bg-block-style { background-color: #E6007A; color: #FFFFFF; }
+        .bg-block-control { background-color: #FFAB19; color: #332200; }
+        .bg-block-var { background-color: #FF6680; color: #FFFFFF; }
+        .bg-block-net { background-color: #4C97FF; color: #FFFFFF; }
+        .bg-block-sensor { background-color: #0FBD8C; color: #FFFFFF; }
+        .bg-block-game { background-color: #FF8000; color: #FFFFFF; }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .bg-grid-pattern {
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        .viewport-frame { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Drag & Drop visuals */
+        .dragging { opacity: 0.45; transform: scale(0.98); }
+        .drop-target-active {
+            border: 2px dashed #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.08) !important;
+        }
+        .drop-indicator {
+            height: 4px;
+            background: #3b82f6;
+            border-radius: 2px;
+            margin: 2px 0;
+            box-shadow: 0 0 8px rgba(59,130,246,0.6);
+        }
+        .component-wrapper {
+            position: relative;
+            transition: box-shadow 0.15s, outline 0.15s;
+        }
+        .component-wrapper.selected {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 4px rgba(99,102,241,0.15);
+        }
+        .component-wrapper:hover:not(.selected) {
+            outline: 1px dashed #94a3b8;
+            outline-offset: 1px;
+        }
+        .component-toolbar {
+            position: absolute;
+            top: -32px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            z-index: 40;
+            white-space: nowrap;
+        }
+        .component-wrapper.selected .component-toolbar,
+        .component-wrapper:hover .component-toolbar {
+            display: flex;
+        }
+        .inline-edit {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+            background: #fff;
+            min-width: 40px;
+        }
+        .empty-drop-zone {
+            min-height: 48px;
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 11px;
+            transition: all 0.15s;
+        }
+        .empty-drop-zone.drop-target-active {
+            border-color: #3b82f6;
+            background: rgba(59,130,246,0.06);
+            color: #3b82f6;
+        }
+        .palette-item {
+            cursor: grab;
+            transition: all 0.12s;
+        }
+        .palette-item:active { cursor: grabbing; }
+        .palette-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Header -->
+    <header class="h-14 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 z-30">
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-indigo-600 px-3 py-1.5 rounded-lg text-white font-bold tracking-wide text-sm shadow-md">
+                <i class="fa-solid fa-cube text-lg"></i>
+                <span>WebCraft Blocks Pro</span>
+            </div>
+            <input id="project-title" type="text" value="マイウェブサイト" class="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm font-medium focus:outline-none focus:border-indigo-500 text-slate-100 w-40 sm:w-56 transition">
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <div class="bg-slate-900 p-1 rounded-lg border border-slate-700 flex text-xs font-semibold">
+                <button id="mode-design-btn" onclick="switchMode('design')" class="px-3 py-1.5 rounded-md flex items-center space-x-1.5 bg-indigo-600 text-white shadow">
+                    <i class="fa-solid fa-compass-drafting"></i><span class="hidden md:inline">デザイン</span>
+                </button>
+                <button id="mode-blocks-btn" onclick="switchMode('blocks')" class="px-3 py-1.5 rounded-md flex items-center space-x-1.5 text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-puzzle-piece"></i><span class="hidden md:inline">ブロック</span>
+                </button>
+                <button id="mode-preview-btn" onclick="switchMode('preview')" class="px-3 py-1.5 rounded-md flex items-center space-x-1.5 text-slate-400 hover:text-emerald-400 transition">
+                    <i class="fa-solid fa-play"></i><span class="hidden md:inline">プレビュー</span>
+                </button>
+            </div>
+            <div class="h-5 w-px bg-slate-700 mx-1"></div>
+            <div class="hidden sm:flex bg-slate-900 p-1 rounded-lg border border-slate-700 text-xs text-slate-400">
+                <button title="PC" onclick="setViewport('desktop')" id="vp-desktop" class="p-1.5 rounded bg-slate-700 text-white"><i class="fa-solid fa-desktop"></i></button>
+                <button title="タブレット" onclick="setViewport('tablet')" id="vp-tablet" class="p-1.5 rounded hover:text-white"><i class="fa-solid fa-tablet-screen-button"></i></button>
+                <button title="スマホ" onclick="setViewport('mobile')" id="vp-mobile" class="p-1.5 rounded hover:text-white"><i class="fa-solid fa-mobile-screen-button"></i></button>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-1.5 text-xs">
+            <div class="flex items-center bg-slate-700 rounded border border-slate-600">
+                <button onclick="undo()" title="元に戻す (Ctrl+Z)" class="p-1.5 hover:bg-slate-600 text-slate-300 rounded-l"><i class="fa-solid fa-rotate-left"></i></button>
+                <button onclick="redo()" title="やり直す (Ctrl+Y)" class="p-1.5 hover:bg-slate-600 text-slate-300 rounded-r border-l border-slate-600"><i class="fa-solid fa-rotate-right"></i></button>
+            </div>
+            <select id="page-selector" onchange="changePage(this.value)" class="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-200 focus:outline-none max-w-[140px]"></select>
+            <button onclick="addNewPage()" title="新しいページ" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded p-1.5 text-slate-200"><i class="fa-solid fa-plus"></i></button>
+            <button onclick="openPageSettings()" title="ページ設定" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded px-2 py-1.5 text-slate-200"><i class="fa-solid fa-gear text-slate-300"></i></button>
+            <button onclick="openAssetManager()" title="アセット" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded px-2 py-1.5 text-slate-200"><i class="fa-solid fa-folder-open text-amber-400"></i></button>
+            <button onclick="saveProjectJSON()" title="保存" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded px-2 py-1.5 text-slate-200"><i class="fa-solid fa-floppy-disk text-blue-400"></i></button>
+            <button onclick="triggerProjectLoad()" title="読み込み" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded px-2 py-1.5 text-slate-200"><i class="fa-solid fa-file-import text-purple-400"></i></button>
+            <input type="file" id="project-file-input" class="hidden" accept=".json" onchange="loadProjectJSON(event)">
+            <div class="relative group">
+                <button class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-3 py-1.5 rounded flex items-center space-x-1 shadow">
+                    <i class="fa-solid fa-download"></i><span>書き出し</span><i class="fa-solid fa-chevron-down text-xs"></i>
+                </button>
+                <div class="absolute right-0 top-full mt-1 w-52 bg-slate-800 border border-slate-700 rounded shadow-xl hidden group-hover:block z-50 py-1 text-slate-200">
+                    <button onclick="exportSingleHTML()" class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center space-x-2">
+                        <i class="fa-solid fa-code text-indigo-400"></i><span>単一HTML</span>
+                    </button>
+                    <button onclick="exportZIPPackage()" class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center space-x-2 border-t border-slate-700">
+                        <i class="fa-solid fa-file-zipper text-amber-400"></i><span>ZIPパッケージ</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- DESIGN MODE -->
+        <div id="workspace-design" class="flex-1 flex w-full h-full overflow-hidden">
+            <!-- Left Palette -->
+            <aside class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col shrink-0">
+                <div class="p-3 border-b border-slate-700 font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                    <span><i class="fa-solid fa-cubes mr-1 text-indigo-400"></i> コンポーネント</span>
+                    <span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">D&D</span>
+                </div>
+                <div class="p-2 border-b border-slate-700">
+                    <input id="component-search" type="text" placeholder="検索..." oninput="filterComponents(this.value)" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div id="component-palette" class="flex-1 overflow-y-auto p-3 space-y-4 text-sm">
+                    <!-- Injected by JS -->
+                </div>
+            </aside>
+
+            <!-- Center Canvas -->
+            <main class="flex-1 bg-slate-950 p-4 overflow-auto flex justify-center items-start bg-grid-pattern relative">
+                <div id="viewport-container" class="viewport-frame bg-white text-slate-800 shadow-2xl rounded-lg min-h-[600px] my-4 overflow-hidden relative border border-slate-700 w-full max-w-4xl">
+                    <div class="bg-slate-100 border-b border-slate-200 px-3 py-1.5 flex items-center justify-between text-xs text-slate-500 font-mono select-none">
+                        <div class="flex items-center space-x-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span>
+                            <span id="canvas-page-title" class="ml-2 font-semibold text-slate-700">Page: home</span>
+                        </div>
+                        <div id="viewport-dimensions-badge">100% Fluid / Desktop</div>
+                    </div>
+                    <div id="design-canvas" class="p-6 min-h-[550px] relative" onclick="deselectElement(event)"
+                         ondragover="handleCanvasDragOver(event)" ondrop="handleCanvasDrop(event)" ondragleave="handleCanvasDragLeave(event)">
+                        <!-- Dynamic -->
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Properties -->
+            <aside class="w-80 bg-slate-800 border-l border-slate-700 flex flex-col shrink-0">
+                <div class="p-3 border-b border-slate-700 font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                    <span><i class="fa-solid fa-sliders mr-1 text-amber-400"></i> プロパティ</span>
+                    <div class="flex items-center space-x-1">
+                        <button onclick="duplicateSelected()" title="複製" class="text-indigo-400 hover:text-indigo-300 text-xs px-1.5 py-0.5 rounded bg-indigo-950/40 border border-indigo-800/50 hidden" id="prop-dup-btn"><i class="fa-solid fa-copy"></i></button>
+                        <button onclick="deleteSelectedElement()" title="削除" class="text-rose-400 hover:text-rose-300 text-xs px-1.5 py-0.5 rounded bg-rose-950/50 border border-rose-800/60 hidden" id="prop-delete-btn"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+                <div id="properties-panel" class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+                    <div class="text-slate-400 text-center py-10">
+                        <i class="fa-solid fa-arrow-pointer text-2xl mb-2 text-slate-600"></i>
+                        <p>要素を選択すると<br>プロパティを編集できます</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- BLOCKS MODE -->
+        <div id="workspace-blocks" class="flex-1 flex w-full h-full overflow-hidden hidden">
+            <aside class="w-72 bg-slate-800 border-r border-slate-700 flex flex-col shrink-0">
+                <div class="p-2 border-b border-slate-700 flex overflow-x-auto space-x-1 text-xs">
+                    <button onclick="filterBlockCategory('all')" class="px-2.5 py-1 rounded bg-slate-700 text-white whitespace-nowrap">すべて</button>
+                    <button onclick="filterBlockCategory('event')" class="px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 whitespace-nowrap">イベント</button>
+                    <button onclick="filterBlockCategory('ui')" class="px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 whitespace-nowrap">UI</button>
+                    <button onclick="filterBlockCategory('control')" class="px-2.5 py-1 rounded bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 whitespace-nowrap">制御</button>
+                    <button onclick="filterBlockCategory('var')" class="px-2.5 py-1 rounded bg-pink-500/20 text-pink-300 hover:bg-pink-500/30 whitespace-nowrap">変数</button>
+                    <button onclick="filterBlockCategory('net')" class="px-2.5 py-1 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 whitespace-nowrap">通信</button>
+                    <button onclick="filterBlockCategory('sensor')" class="px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 whitespace-nowrap">センサー</button>
+                </div>
+                <div id="block-templates-list" class="flex-1 overflow-y-auto p-3 space-y-2 text-xs"></div>
+            </aside>
+            <main class="flex-1 bg-slate-950 p-6 overflow-auto bg-grid-pattern relative flex flex-col">
+                <div class="mb-3 flex items-center justify-between text-xs bg-slate-800/80 backdrop-blur p-2.5 rounded-lg border border-slate-700">
+                    <div class="flex items-center space-x-2 text-slate-300">
+                        <i class="fa-solid fa-puzzle-piece text-amber-400"></i>
+                        <span>スクリプトエディタ</span>
+                    </div>
+                    <button onclick="clearBlocks()" class="bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700 px-2.5 py-1 rounded">
+                        <i class="fa-solid fa-trash-can mr-1"></i>全消去
+                    </button>
+                </div>
+                <div id="blocks-script-workspace" class="flex-1 border-2 border-dashed border-slate-700 rounded-xl p-4 min-h-[500px] space-y-3 overflow-y-auto bg-slate-900/50"></div>
+            </main>
+            <aside class="w-80 bg-slate-900 border-l border-slate-700 flex flex-col shrink-0">
+                <div class="p-3 border-b border-slate-700 font-bold text-xs uppercase tracking-wider text-slate-400">
+                    <i class="fa-solid fa-code mr-1 text-emerald-400"></i> 生成コード (JS)
+                </div>
+                <div class="flex-1 p-3 overflow-auto font-mono text-xs text-emerald-400 bg-slate-950">
+                    <pre id="generated-js-code" class="whitespace-pre-wrap">// ブロックをつなぐとコードが生成されます</pre>
+                </div>
+            </aside>
+        </div>
+
+        <!-- PREVIEW MODE -->
+        <div id="workspace-preview" class="flex-1 flex flex-col w-full h-full bg-slate-950 overflow-hidden hidden">
+            <div class="bg-slate-800 border-b border-slate-700 px-4 py-2 flex items-center justify-between text-xs">
+                <div class="flex items-center space-x-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">● ライブプレビュー</span>
+                    <span class="text-slate-400">実際の動作を確認できます</span>
+                </div>
+                <button onclick="reloadPreview()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 rounded flex items-center space-x-1">
+                    <i class="fa-solid fa-rotate-right mr-1"></i>再読み込み
+                </button>
+            </div>
+            <div class="flex-1 p-4 overflow-auto flex justify-center bg-grid-pattern">
+                <iframe id="preview-iframe" class="bg-white rounded-lg shadow-2xl border border-slate-700 w-full max-w-4xl h-full min-h-[600px] transition-all duration-300"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset Modal -->
+    <div id="asset-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-xl p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center"><i class="fa-solid fa-folder-open text-amber-400 mr-2"></i> アセット管理</h3>
+                <button onclick="closeAssetManager()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="border-2 border-dashed border-slate-600 hover:border-indigo-500 rounded-lg p-6 text-center cursor-pointer bg-slate-900/40" onclick="document.getElementById('asset-file-input').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-3xl text-indigo-400 mb-2 block"></i>
+                <p class="text-sm text-slate-200">画像・音声・動画をアップロード</p>
+                <input type="file" id="asset-file-input" class="hidden" multiple accept="image/*,audio/*,video/*" onchange="handleAssetUpload(event)">
+            </div>
+            <div id="assets-list" class="max-h-60 overflow-y-auto space-y-2 text-xs"></div>
+            <div class="flex justify-end pt-2 border-t border-slate-700">
+                <button onclick="closeAssetManager()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-xs font-semibold text-slate-200">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Settings Modal -->
+    <div id="page-settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                <h3 class="font-bold text-slate-100 flex items-center"><i class="fa-solid fa-gear text-slate-300 mr-2"></i> ページ設定</h3>
+                <button onclick="closePageSettings()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">ページタイトル</label>
+                    <input id="ps-title" type="text" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">背景色</label>
+                    <input id="ps-bg" type="color" value="#ffffff" class="w-full h-9 bg-slate-700 border border-slate-600 rounded cursor-pointer">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">最大幅 (max-width)</label>
+                    <select id="ps-maxw" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100">
+                        <option value="100%">フル幅 (100%)</option>
+                        <option value="1280px">ワイド (1280px)</option>
+                        <option value="1024px">標準 (1024px)</option>
+                        <option value="768px">狭め (768px)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">余白 (padding)</label>
+                    <input id="ps-pad" type="text" value="24px" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100">
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">フォント</label>
+                    <select id="ps-font" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100">
+                        <option value="'Zen Kaku Gothic New', sans-serif">Zen Kaku Gothic</option>
+                        <option value="'Noto Sans JP', sans-serif">Noto Sans JP</option>
+                        <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans</option>
+                        <option value="system-ui, sans-serif">システム標準</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-700">
+                <button onclick="closePageSettings()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-xs font-semibold text-slate-200">キャンセル</button>
+                <button onclick="applyPageSettings()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded text-xs font-semibold text-white">適用</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===================== STATE =====================
+        let project = {
+            title: "マイウェブサイト",
+            activePage: "home",
+            pages: {
+                "home": {
+                    title: "ホーム",
+                    components: [],
+                    settings: {
+                        backgroundColor: "#ffffff",
+                        maxWidth: "100%",
+                        padding: "24px",
+                        fontFamily: "'Zen Kaku Gothic New', sans-serif"
+                    }
+                }
+            },
+            blocks: [],
+            assets: []
+        };
+
+        let selectedElementId = null;
+        let currentMode = 'design';
+        let currentViewport = 'desktop';
+        let undoStack = [];
+        let redoStack = [];
+        let dragData = null; // { type: 'palette'|'reorder', componentType?, id?, parentId? }
+
+        // ===================== COMPONENT DEFINITIONS =====================
+        const COMPONENT_DEFS = [
+            { type: 'heading', label: '見出し', icon: 'fa-heading', color: 'text-indigo-400', cat: 'text' },
+            { type: 'paragraph', label: '文章', icon: 'fa-paragraph', color: 'text-indigo-400', cat: 'text' },
+            { type: 'button', label: 'ボタン', icon: 'fa-hand-pointer', color: 'text-amber-400', cat: 'text' },
+            { type: 'link', label: 'リンク', icon: 'fa-link', color: 'text-blue-400', cat: 'text' },
+            { type: 'list', label: 'リスト', icon: 'fa-list-ul', color: 'text-teal-400', cat: 'text' },
+            { type: 'image', label: '画像', icon: 'fa-image', color: 'text-emerald-400', cat: 'media' },
+            { type: 'video', label: '動画', icon: 'fa-video', color: 'text-rose-400', cat: 'media' },
+            { type: 'audio', label: '音声', icon: 'fa-volume-high', color: 'text-cyan-400', cat: 'media' },
+            { type: 'icon', label: 'アイコン', icon: 'fa-icons', color: 'text-purple-400', cat: 'media' },
+            { type: 'container', label: 'コンテナ', icon: 'fa-box', color: 'text-yellow-400', cat: 'layout' },
+            { type: 'row', label: '横並び', icon: 'fa-table-columns', color: 'text-yellow-400', cat: 'layout' },
+            { type: 'card', label: 'カード', icon: 'fa-id-card', color: 'text-orange-400', cat: 'layout' },
+            { type: 'hero', label: 'ヒーロー', icon: 'fa-panorama', color: 'text-pink-400', cat: 'layout' },
+            { type: 'spacer', label: 'スペース', icon: 'fa-arrows-up-down', color: 'text-slate-400', cat: 'layout' },
+            { type: 'divider', label: '区切り線', icon: 'fa-minus', color: 'text-slate-400', cat: 'layout' },
+            { type: 'input', label: '入力欄', icon: 'fa-pen-to-square', color: 'text-teal-400', cat: 'form' },
+            { type: 'textarea', label: 'テキスト領域', icon: 'fa-align-left', color: 'text-teal-400', cat: 'form' },
+            { type: 'table', label: 'テーブル', icon: 'fa-table', color: 'text-cyan-400', cat: 'form' },
+            { type: 'map', label: '地図/埋込', icon: 'fa-map-location-dot', color: 'text-red-400', cat: 'embed' },
+            { type: 'gamecanvas', label: 'ゲームCanvas', icon: 'fa-gamepad', color: 'text-fuchsia-400', cat: 'embed' },
+            { type: 'navbar', label: 'ナビバー', icon: 'fa-bars', color: 'text-indigo-300', cat: 'layout' },
+            { type: 'footer', label: 'フッター', icon: 'fa-shoe-prints', color: 'text-slate-300', cat: 'layout' },
+        ];
+
+        // ===================== UTILS =====================
+        function saveState() {
+            if (undoStack.length > 40) undoStack.shift();
+            undoStack.push(JSON.stringify(project));
+            redoStack = [];
+        }
+        function undo() {
+            if (!undoStack.length) return;
+            redoStack.push(JSON.stringify(project));
+            project = JSON.parse(undoStack.pop());
+            selectedElementId = null;
+            refreshAll();
+        }
+        function redo() {
+            if (!redoStack.length) return;
+            undoStack.push(JSON.stringify(project));
+            project = JSON.parse(redoStack.pop());
+            selectedElementId = null;
+            refreshAll();
+        }
+        function refreshAll() {
+            renderPageSelector();
+            renderCanvas();
+            renderPropertiesPanel();
+            renderBlocksWorkspace();
+            applyPageVisualSettings();
+        }
+
+        function getActivePage() {
+            return project.pages[project.activePage];
+        }
+
+        function findComponent(id, list = null) {
+            const comps = list || getActivePage().components;
+            for (const c of comps) {
+                if (c.id === id) return { comp: c, parent: null, list: comps };
+                if (c.children && c.children.length) {
+                    const found = findComponent(id, c.children);
+                    if (found) return { ...found, parent: c };
+                }
+            }
+            return null;
+        }
+
+        function generateId(type) {
+            return `elem_${type}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+        }
+
+        // ===================== CREATE COMPONENT =====================
+        function createComponentData(type) {
+            const id = generateId(type);
+            const base = {
+                id,
+                type,
+                styles: {
+                    color: '#1e293b',
+                    fontSize: '16px',
+                    backgroundColor: 'transparent',
+                    padding: '8px',
+                    margin: '0 0 12px 0',
+                    borderRadius: '6px',
+                    textAlign: 'left',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                }
+            };
+
+            switch (type) {
+                case 'heading':
+                    return { ...base, content: '新しい見出し', level: 'h2',
+                        styles: { ...base.styles, fontSize: '28px', fontWeight: '700', margin: '0 0 16px 0' } };
+                case 'paragraph':
+                    return { ...base, content: 'ここに文章を入力します。ダブルクリックで直接編集できます。' };
+                case 'button':
+                    return { ...base, content: 'クリックしてください', href: '', target: '_self',
+                        styles: { ...base.styles, backgroundColor: '#4f46e5', color: '#ffffff', padding: '12px 24px',
+                            borderRadius: '8px', textAlign: 'center', display: 'inline-block', width: 'auto', cursor: 'pointer', border: 'none', textDecoration: 'none' } };
+                case 'link':
+                    return { ...base, content: 'リンクテキスト', href: 'https://example.com',
+                        styles: { ...base.styles, color: '#2563eb', textDecoration: 'underline' } };
+                case 'list':
+                    return { ...base, items: ['項目1', '項目2', '項目3'], listType: 'ul' };
+                case 'image':
+                    return { ...base, src: 'https://placehold.co/800x400/6366f1/ffffff?text=Image', alt: '画像',
+                        styles: { ...base.styles, padding: '0', borderRadius: '8px', overflow: 'hidden' } };
+                case 'video':
+                    return { ...base, src: 'https://www.w3schools.com/html/mov_bbb.mp4',
+                        styles: { ...base.styles, padding: '0' } };
+                case 'audio':
+                    return { ...base, src: 'https://www.w3schools.com/html/horse.mp3' };
+                case 'icon':
+                    return { ...base, iconClass: 'fa-solid fa-star', iconSize: '32px',
+                        styles: { ...base.styles, color: '#f59e0b', textAlign: 'center', fontSize: '32px' } };
+                case 'container':
+                    return { ...base, children: [],
+                        styles: { ...base.styles, border: '1px dashed #cbd5e1', padding: '20px', minHeight: '80px', backgroundColor: '#f8fafc' } };
+                case 'row':
+                    return { ...base, children: [],
+                        styles: { ...base.styles, display: 'flex', gap: '16px', flexWrap: 'wrap', padding: '12px',
+                            border: '1px dashed #e2e8f0', minHeight: '60px', backgroundColor: '#f8fafc' } };
+                case 'card':
+                    return { ...base, children: [],
+                        styles: { ...base.styles, backgroundColor: '#ffffff', border: '1px solid #e2e8f0',
+                            borderRadius: '12px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.06)' } };
+                case 'hero':
+                    return { ...base, content: 'ヒーロータイトル', subtitle: 'サブタイトルをここに',
+                        styles: { ...base.styles, backgroundColor: '#4f46e5', color: '#ffffff', padding: '64px 32px',
+                            textAlign: 'center', borderRadius: '12px', fontSize: '36px', fontWeight: '700' } };
+                case 'spacer':
+                    return { ...base, height: '40px', styles: { ...base.styles, padding: '0', margin: '0' } };
+                case 'divider':
+                    return { ...base, styles: { ...base.styles, border: 'none', borderTop: '1px solid #e2e8f0',
+                            padding: '0', margin: '16px 0', height: '1px' } };
+                case 'input':
+                    return { ...base, placeholder: '入力してください...', value: '',
+                        styles: { ...base.styles, border: '1px solid #cbd5e1', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fff' } };
+                case 'textarea':
+                    return { ...base, placeholder: 'メッセージを入力...', rows: 4,
+                        styles: { ...base.styles, border: '1px solid #cbd5e1', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fff' } };
+                case 'table':
+                    return { ...base, rows: 3, cols: 3, data: [['見出し1','見出し2','見出し3'],['データ','データ','データ'],['データ','データ','データ']] };
+                case 'map':
+                    return { ...base, embedUrl: 'https://maps.google.com/maps?q=Tokyo&t=&z=13&ie=UTF8&iwloc=&output=embed',
+                        styles: { ...base.styles, padding: '0', height: '280px' } };
+                case 'gamecanvas':
+                    return { ...base, width: 480, height: 320,
+                        styles: { ...base.styles, backgroundColor: '#0f172a', padding: '0' } };
+                case 'navbar':
+                    return { ...base, brand: 'Brand', links: ['ホーム', 'について', 'お問い合わせ'],
+                        styles: { ...base.styles, backgroundColor: '#1e293b', color: '#ffffff', padding: '14px 24px',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '0' } };
+                case 'footer':
+                    return { ...base, content: '© 2026 My Website. All rights reserved.',
+                        styles: { ...base.styles, backgroundColor: '#0f172a', color: '#94a3b8', padding: '32px',
+                            textAlign: 'center', fontSize: '14px' } };
+                default:
+                    return base;
+            }
+        }
+
+        // ===================== PALETTE =====================
+        function renderComponentPalette(filter = '') {
+            const container = document.getElementById('component-palette');
+            const cats = {
+                text: { title: 'テキスト & ボタン', icon: 'fa-font' },
+                media: { title: 'メディア', icon: 'fa-photo-film' },
+                layout: { title: 'レイアウト', icon: 'fa-boxes-packing' },
+                form: { title: 'フォーム', icon: 'fa-wpforms' },
+                embed: { title: '埋め込み', icon: 'fa-globe' }
+            };
+            let html = '';
+            Object.keys(cats).forEach(catKey => {
+                const items = COMPONENT_DEFS.filter(d => d.cat === catKey && (!filter || d.label.includes(filter) || d.type.includes(filter)));
+                if (!items.length) return;
+                html += `<div><div class="text-xs font-semibold text-slate-400 mb-2 flex items-center"><i class="fa-solid ${cats[catKey].icon} mr-1.5"></i> ${cats[catKey].title}</div>
+                    <div class="grid grid-cols-2 gap-2">`;
+                items.forEach(d => {
+                    html += `<div class="palette-item bg-slate-700 hover:bg-slate-600 border border-slate-600 p-2.5 rounded text-center"
+                        draggable="true"
+                        ondragstart="handlePaletteDragStart(event, '${d.type}')"
+                        onclick="addComponent('${d.type}')">
+                        <i class="fa-solid ${d.icon} text-lg ${d.color} block mb-1"></i>
+                        <span class="text-xs">${d.label}</span>
+                    </div>`;
+                });
+                html += `</div></div>`;
+            });
+            container.innerHTML = html || '<p class="text-slate-500 text-center text-xs py-4">該当なし</p>';
+        }
+        function filterComponents(q) { renderComponentPalette(q.trim().toLowerCase()); }
+
+        // ===================== DRAG & DROP =====================
+        function handlePaletteDragStart(e, type) {
+            dragData = { source: 'palette', type };
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('text/plain', type);
+        }
+
+        function handleComponentDragStart(e, id) {
+            e.stopPropagation();
+            dragData = { source: 'reorder', id };
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', id);
+            setTimeout(() => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('dragging');
+            }, 0);
+        }
+
+        function handleComponentDragEnd(e) {
+            document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+            document.querySelectorAll('.drop-target-active').forEach(el => el.classList.remove('drop-target-active'));
+            document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+            dragData = null;
+        }
+
+        function handleCanvasDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = dragData?.source === 'palette' ? 'copy' : 'move';
+            // highlight canvas if empty or for top-level
+            const canvas = document.getElementById('design-canvas');
+            if (!e.target.closest('.component-wrapper') && !e.target.closest('.empty-drop-zone')) {
+                canvas.classList.add('drop-target-active');
+            }
+        }
+        function handleCanvasDragLeave(e) {
+            if (e.target.id === 'design-canvas') {
+                e.target.classList.remove('drop-target-active');
+            }
+        }
+
+        function handleCanvasDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('design-canvas').classList.remove('drop-target-active');
+            if (!dragData) return;
+
+            // If dropped on a container empty zone or specific target, handled elsewhere
+            if (e.target.closest('.empty-drop-zone') || e.target.closest('[data-drop-parent]')) return;
+
+            saveState();
+            if (dragData.source === 'palette') {
+                const comp = createComponentData(dragData.type);
+                getActivePage().components.push(comp);
+                selectedElementId = comp.id;
+            } else if (dragData.source === 'reorder') {
+                // Move to end of top-level
+                const found = findComponent(dragData.id);
+                if (found) {
+                    found.list.splice(found.list.indexOf(found.comp), 1);
+                    getActivePage().components.push(found.comp);
+                }
+            }
+            renderCanvas();
+            renderPropertiesPanel();
+            dragData = null;
+        }
+
+        function handleContainerDragOver(e, parentId) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.add('drop-target-active');
+        }
+        function handleContainerDragLeave(e) {
+            e.currentTarget.classList.remove('drop-target-active');
+        }
+        function handleContainerDrop(e, parentId) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.currentTarget.classList.remove('drop-target-active');
+            if (!dragData) return;
+            saveState();
+
+            const parentFound = findComponent(parentId);
+            if (!parentFound || !parentFound.comp.children) return;
+
+            if (dragData.source === 'palette') {
+                const comp = createComponentData(dragData.type);
+                parentFound.comp.children.push(comp);
+                selectedElementId = comp.id;
+            } else if (dragData.source === 'reorder' && dragData.id !== parentId) {
+                // Prevent dropping into self
+                const found = findComponent(dragData.id);
+                if (found) {
+                    // Check not descendant
+                    let isDesc = false;
+                    function checkDesc(list) {
+                        for (const c of list) {
+                            if (c.id === parentId) { isDesc = true; return; }
+                            if (c.children) checkDesc(c.children);
+                        }
+                    }
+                    if (found.comp.children) checkDesc(found.comp.children);
+                    if (!isDesc) {
+                        found.list.splice(found.list.indexOf(found.comp), 1);
+                        parentFound.comp.children.push(found.comp);
+                    }
+                }
+            }
+            renderCanvas();
+            renderPropertiesPanel();
+            dragData = null;
+        }
+
+        // ===================== ADD / DELETE / DUPLICATE =====================
+        function addComponent(type) {
+            saveState();
+            const comp = createComponentData(type);
+            getActivePage().components.push(comp);
+            selectedElementId = comp.id;
+            renderCanvas();
+            renderPropertiesPanel();
+        }
+
+        function deleteSelectedElement() {
+            if (!selectedElementId) return;
+            saveState();
+            const found = findComponent(selectedElementId);
+            if (found) {
+                found.list.splice(found.list.indexOf(found.comp), 1);
+            }
+            selectedElementId = null;
+            renderCanvas();
+            renderPropertiesPanel();
+        }
+
+        function duplicateSelected() {
+            if (!selectedElementId) return;
+            saveState();
+            const found = findComponent(selectedElementId);
+            if (!found) return;
+            const clone = JSON.parse(JSON.stringify(found.comp));
+            function reId(c) {
+                c.id = generateId(c.type);
+                if (c.children) c.children.forEach(reId);
+            }
+            reId(clone);
+            const idx = found.list.indexOf(found.comp);
+            found.list.splice(idx + 1, 0, clone);
+            selectedElementId = clone.id;
+            renderCanvas();
+            renderPropertiesPanel();
+        }
+
+        function moveComponent(id, direction) {
+            saveState();
+            const found = findComponent(id);
+            if (!found) return;
+            const idx = found.list.indexOf(found.comp);
+            const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+            if (newIdx < 0 || newIdx >= found.list.length) return;
+            found.list.splice(idx, 1);
+            found.list.splice(newIdx, 0, found.comp);
+            renderCanvas();
+        }
+
+        // ===================== RENDER CANVAS =====================
+        function renderCanvas() {
+            const canvas = document.getElementById('design-canvas');
+            const page = getActivePage();
+            canvas.innerHTML = '';
+
+            // Apply page settings to canvas
+            canvas.style.backgroundColor = page.settings?.backgroundColor || '#ffffff';
+            canvas.style.fontFamily = page.settings?.fontFamily || 'inherit';
+            canvas.style.padding = page.settings?.padding || '24px';
+            if (page.settings?.maxWidth && page.settings.maxWidth !== '100%') {
+                canvas.style.maxWidth = page.settings.maxWidth;
+                canvas.style.margin = '0 auto';
+            }
+
+            if (!page.components.length) {
+                canvas.innerHTML = `
+                    <div class="text-center py-24 text-slate-400 empty-drop-zone" style="min-height:400px"
+                         ondragover="handleCanvasDragOver(event)" ondrop="handleCanvasDrop(event)">
+                        <i class="fa-solid fa-layer-group text-4xl mb-3 text-slate-300 block"></i>
+                        <p class="font-medium text-slate-600">キャンバスは空です</p>
+                        <p class="text-xs mt-1">左のコンポーネントをドラッグ＆ドロップ、またはクリックして追加</p>
+                    </div>`;
+                return;
+            }
+
+            page.components.forEach(comp => {
+                canvas.appendChild(renderComponentNode(comp));
+            });
+        }
+
+        function renderComponentNode(comp) {
+            const wrapper = document.createElement('div');
+            wrapper.id = comp.id;
+            wrapper.className = `component-wrapper group ${selectedElementId === comp.id ? 'selected' : ''}`;
+            wrapper.draggable = true;
+            wrapper.ondragstart = (e) => handleComponentDragStart(e, comp.id);
+            wrapper.ondragend = handleComponentDragEnd;
+            wrapper.onclick = (e) => {
+                e.stopPropagation();
+                selectElement(comp.id);
+            };
+
+            // Apply styles (in design mode, do NOT apply fixed/absolute/sticky so editing stays easy)
+            const designStyles = { ...(comp.styles || {}) };
+            const isFixedLike = designStyles.position === 'fixed' || designStyles.position === 'absolute' || designStyles.position === 'sticky';
+            if (isFixedLike) {
+                // Keep visual styles but force normal flow in the editor
+                delete designStyles.position;
+                delete designStyles.top;
+                delete designStyles.right;
+                delete designStyles.bottom;
+                delete designStyles.left;
+                delete designStyles.zIndex;
+                delete designStyles.transform;
+            }
+            Object.assign(wrapper.style, designStyles);
+
+            // FIXED badge
+            if (isFixedLike) {
+                const badge = document.createElement('div');
+                badge.className = 'absolute -top-2 left-2 bg-amber-500 text-black text-[9px] font-bold px-1.5 py-0.5 rounded shadow z-20 flex items-center gap-1';
+                badge.innerHTML = `<i class="fa-solid fa-thumbtack"></i> FIXED`;
+                wrapper.appendChild(badge);
+                wrapper.style.outline = '2px dashed #f59e0b';
+                wrapper.style.outlineOffset = '2px';
+            }
+
+            // Toolbar
+            const toolbar = document.createElement('div');
+            toolbar.className = 'component-toolbar bg-slate-800 text-white text-[10px] rounded shadow-lg px-1 py-0.5 items-center space-x-0.5';
+            toolbar.innerHTML = `
+                <button onclick="event.stopPropagation();moveComponent('${comp.id}','up')" class="hover:bg-slate-600 px-1.5 py-0.5 rounded" title="上へ"><i class="fa-solid fa-arrow-up"></i></button>
+                <button onclick="event.stopPropagation();moveComponent('${comp.id}','down')" class="hover:bg-slate-600 px-1.5 py-0.5 rounded" title="下へ"><i class="fa-solid fa-arrow-down"></i></button>
+                <button onclick="event.stopPropagation();duplicateSelected()" class="hover:bg-slate-600 px-1.5 py-0.5 rounded" title="複製"><i class="fa-solid fa-copy"></i></button>
+                <button onclick="event.stopPropagation();deleteSelectedElement()" class="hover:bg-rose-600 px-1.5 py-0.5 rounded text-rose-300" title="削除"><i class="fa-solid fa-trash"></i></button>
+                <span class="font-mono text-indigo-300 px-1">#${comp.id.split('_').pop()}</span>
+            `;
+            wrapper.appendChild(toolbar);
+
+            // Content
+            let contentEl;
+            switch (comp.type) {
+                case 'heading':
+                    contentEl = document.createElement(comp.level || 'h2');
+                    contentEl.textContent = comp.content;
+                    contentEl.ondblclick = (e) => startInlineEdit(e, comp, 'content');
+                    break;
+                case 'paragraph':
+                    contentEl = document.createElement('p');
+                    contentEl.textContent = comp.content;
+                    contentEl.ondblclick = (e) => startInlineEdit(e, comp, 'content');
+                    break;
+                case 'button':
+                    if (comp.href) {
+                        contentEl = document.createElement('a');
+                        contentEl.href = comp.href;
+                        contentEl.target = comp.target || '_self';
+                        if (comp.target === '_blank') contentEl.rel = 'noopener noreferrer';
+                        contentEl.textContent = comp.content;
+                        contentEl.className = 'pointer-events-none';
+                        // Ensure button-like appearance is kept via styles already applied to wrapper
+                    } else {
+                        contentEl = document.createElement('button');
+                        contentEl.textContent = comp.content;
+                        contentEl.className = 'pointer-events-none';
+                    }
+                    contentEl.ondblclick = (e) => startInlineEdit(e, comp, 'content');
+                    break;
+                case 'link':
+                    contentEl = document.createElement('a');
+                    contentEl.href = comp.href || '#';
+                    contentEl.textContent = comp.content;
+                    contentEl.className = 'pointer-events-none';
+                    contentEl.ondblclick = (e) => startInlineEdit(e, comp, 'content');
+                    break;
+                case 'list':
+                    contentEl = document.createElement(comp.listType || 'ul');
+                    contentEl.style.paddingLeft = '1.5rem';
+                    contentEl.style.listStyle = comp.listType === 'ol' ? 'decimal' : 'disc';
+                    (comp.items || []).forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = item;
+                        contentEl.appendChild(li);
+                    });
+                    break;
+                case 'image':
+                    contentEl = document.createElement('img');
+                    contentEl.src = comp.src;
+                    contentEl.alt = comp.alt || '';
+                    contentEl.className = 'max-w-full h-auto block';
+                    contentEl.style.borderRadius = comp.styles?.borderRadius || '8px';
+                    break;
+                case 'video':
+                    contentEl = document.createElement('video');
+                    contentEl.src = comp.src;
+                    contentEl.controls = true;
+                    contentEl.className = 'w-full max-h-72 rounded';
+                    break;
+                case 'audio':
+                    contentEl = document.createElement('audio');
+                    contentEl.src = comp.src;
+                    contentEl.controls = true;
+                    contentEl.className = 'w-full';
+                    break;
+                case 'icon':
+                    contentEl = document.createElement('div');
+                    contentEl.innerHTML = `<i class="${comp.iconClass || 'fa-solid fa-star'}" style="font-size:${comp.iconSize || '32px'}"></i>`;
+                    break;
+                case 'spacer':
+                    contentEl = document.createElement('div');
+                    contentEl.style.height = comp.height || '40px';
+                    contentEl.className = 'w-full bg-slate-100/40 flex items-center justify-center text-[10px] text-slate-400';
+                    contentEl.textContent = `スペース (${comp.height})`;
+                    break;
+                case 'divider':
+                    contentEl = document.createElement('hr');
+                    contentEl.style.border = 'none';
+                    contentEl.style.borderTop = '1px solid #e2e8f0';
+                    contentEl.style.margin = '0';
+                    break;
+                case 'input':
+                    contentEl = document.createElement('input');
+                    contentEl.type = 'text';
+                    contentEl.placeholder = comp.placeholder || '';
+                    contentEl.disabled = true;
+                    contentEl.className = 'w-full';
+                    break;
+                case 'textarea':
+                    contentEl = document.createElement('textarea');
+                    contentEl.placeholder = comp.placeholder || '';
+                    contentEl.rows = comp.rows || 4;
+                    contentEl.disabled = true;
+                    contentEl.className = 'w-full';
+                    break;
+                case 'table':
+                    contentEl = document.createElement('table');
+                    contentEl.className = 'w-full border-collapse text-sm';
+                    contentEl.style.border = '1px solid #e2e8f0';
+                    (comp.data || []).forEach((row, ri) => {
+                        const tr = document.createElement('tr');
+                        row.forEach(cell => {
+                            const td = document.createElement(ri === 0 ? 'th' : 'td');
+                            td.textContent = cell;
+                            td.style.border = '1px solid #e2e8f0';
+                            td.style.padding = '8px 12px';
+                            if (ri === 0) { td.style.background = '#f1f5f9'; td.style.fontWeight = '600'; }
+                            tr.appendChild(td);
+                        });
+                        contentEl.appendChild(tr);
+                    });
+                    break;
+                case 'map':
+                    contentEl = document.createElement('iframe');
+                    contentEl.src = comp.embedUrl;
+                    contentEl.width = '100%';
+                    contentEl.height = '280';
+                    contentEl.style.border = '0';
+                    contentEl.loading = 'lazy';
+                    break;
+                case 'gamecanvas':
+                    contentEl = document.createElement('canvas');
+                    contentEl.width = comp.width || 480;
+                    contentEl.height = comp.height || 320;
+                    contentEl.className = 'border border-slate-700 max-w-full bg-slate-900 rounded';
+                    break;
+                case 'hero':
+                    contentEl = document.createElement('div');
+                    contentEl.innerHTML = `<div style="font-size:inherit;font-weight:inherit">${comp.content || ''}</div>
+                        <div style="font-size:18px;font-weight:400;margin-top:12px;opacity:0.9">${comp.subtitle || ''}</div>`;
+                    contentEl.ondblclick = (e) => startInlineEdit(e, comp, 'content');
+                    break;
+                case 'navbar':
+                    contentEl = document.createElement('div');
+                    contentEl.style.display = 'flex';
+                    contentEl.style.justifyContent = 'space-between';
+                    contentEl.style.alignItems = 'center';
+                    contentEl.style.width = '100%';
+                    const brand = document.createElement('span');
+                    brand.style.fontWeight = '700';
+                    brand.style.fontSize = '18px';
+                    brand.textContent = comp.brand || 'Brand';
+                    const links = document.createElement('div');
+                    links.style.display = 'flex';
+                    links.style.gap = '20px';
+                    (comp.links || []).forEach(l => {
+                        const a = document.createElement('span');
+                        a.textContent = l;
+                        a.style.opacity = '0.9';
+                        a.style.fontSize = '14px';
+                        links.appendChild(a);
+                    });
+                    contentEl.appendChild(brand);
+                    contentEl.appendChild(links);
+                    break;
+                case 'footer':
+                    contentEl = document.createElement('div');
+                    contentEl.textContent = comp.content || '';
+                    contentEl.ondblclick = (e) => startInlineEdit(e, comp, 'content');
+                    break;
+                case 'container':
+                case 'row':
+                case 'card':
+                    contentEl = document.createElement('div');
+                    contentEl.style.width = '100%';
+                    // label
+                    const label = document.createElement('div');
+                    label.className = 'text-[10px] text-slate-400 uppercase tracking-wider mb-2 font-bold opacity-60';
+                    label.textContent = comp.type;
+                    contentEl.appendChild(label);
+
+                    if (comp.children && comp.children.length) {
+                        comp.children.forEach(child => {
+                            contentEl.appendChild(renderComponentNode(child));
+                        });
+                    } else {
+                        const empty = document.createElement('div');
+                        empty.className = 'empty-drop-zone';
+                        empty.textContent = 'ここにドロップして追加';
+                        empty.ondragover = (e) => handleContainerDragOver(e, comp.id);
+                        empty.ondragleave = handleContainerDragLeave;
+                        empty.ondrop = (e) => handleContainerDrop(e, comp.id);
+                        contentEl.appendChild(empty);
+                    }
+                    // Also allow drop on the container itself
+                    contentEl.ondragover = (e) => handleContainerDragOver(e, comp.id);
+                    contentEl.ondragleave = handleContainerDragLeave;
+                    contentEl.ondrop = (e) => handleContainerDrop(e, comp.id);
+                    break;
+                default:
+                    contentEl = document.createElement('div');
+                    contentEl.textContent = comp.type;
+            }
+
+            if (contentEl) wrapper.appendChild(contentEl);
+            return wrapper;
+        }
+
+        function startInlineEdit(e, comp, field) {
+            e.stopPropagation();
+            const target = e.currentTarget;
+            const original = comp[field] || '';
+            target.contentEditable = true;
+            target.classList.add('inline-edit');
+            target.focus();
+
+            // Select all
+            const range = document.createRange();
+            range.selectNodeContents(target);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+
+            function finish() {
+                target.contentEditable = false;
+                target.classList.remove('inline-edit');
+                const newVal = target.textContent.trim();
+                if (newVal !== original) {
+                    saveState();
+                    comp[field] = newVal;
+                }
+                target.removeEventListener('blur', finish);
+                target.removeEventListener('keydown', onKey);
+            }
+            function onKey(ev) {
+                if (ev.key === 'Enter' && !ev.shiftKey) {
+                    ev.preventDefault();
+                    target.blur();
+                }
+                if (ev.key === 'Escape') {
+                    target.textContent = original;
+                    target.blur();
+                }
+            }
+            target.addEventListener('blur', finish);
+            target.addEventListener('keydown', onKey);
+        }
+
+        // ===================== SELECT / PROPERTIES =====================
+        function selectElement(id) {
+            selectedElementId = id;
+            renderCanvas();
+            renderPropertiesPanel();
+            document.getElementById('prop-delete-btn').classList.remove('hidden');
+            document.getElementById('prop-dup-btn').classList.remove('hidden');
+        }
+        function deselectElement(e) {
+            if (e.target.id === 'design-canvas' || e.target.classList.contains('empty-drop-zone')) {
+                selectedElementId = null;
+                renderCanvas();
+                renderPropertiesPanel();
+                document.getElementById('prop-delete-btn').classList.add('hidden');
+                document.getElementById('prop-dup-btn').classList.add('hidden');
+            }
+        }
+
+        function renderPropertiesPanel() {
+            const panel = document.getElementById('properties-panel');
+            if (!selectedElementId) {
+                panel.innerHTML = `<div class="text-slate-400 text-center py-10">
+                    <i class="fa-solid fa-arrow-pointer text-2xl mb-2 text-slate-600"></i>
+                    <p>要素を選択すると<br>プロパティを編集できます</p>
+                    <p class="text-[10px] mt-3 text-slate-500">ダブルクリックでテキストを直接編集</p>
+                </div>`;
+                return;
+            }
+            const found = findComponent(selectedElementId);
+            if (!found) return;
+            const comp = found.comp;
+            const styles = comp.styles || {};
+
+            let html = `
+                <div class="space-y-3">
+                    <div class="bg-slate-700/50 p-2 rounded border border-slate-600 flex items-center justify-between">
+                        <span class="font-mono font-bold text-indigo-300 text-[11px]">#${comp.id}</span>
+                        <span class="text-[10px] uppercase bg-slate-600 px-1.5 py-0.5 rounded text-slate-200">${comp.type}</span>
+                    </div>`;
+
+            // Content fields
+            if (comp.content !== undefined) {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">テキスト内容</label>
+                    <input type="text" value="${escapeAttr(comp.content)}" onchange="updateProp('content', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"></div>`;
+            }
+            if (comp.subtitle !== undefined) {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">サブタイトル</label>
+                    <input type="text" value="${escapeAttr(comp.subtitle)}" onchange="updateProp('subtitle', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:border-indigo-500"></div>`;
+            }
+            if (comp.src !== undefined) {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">メディアURL</label>
+                    <input type="text" value="${escapeAttr(comp.src)}" onchange="updateProp('src', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:border-indigo-500">
+                    ${project.assets.length ? `<div class="mt-1 text-[10px] text-slate-500">アセットから選択: <select onchange="if(this.value)updateProp('src',this.value)" class="bg-slate-700 border border-slate-600 rounded text-[10px] max-w-full">
+                        <option value="">--</option>${project.assets.map(a => `<option value="${a.dataUrl}">${a.name}</option>`).join('')}</select></div>` : ''}
+                    </div>`;
+            }
+            if (comp.href !== undefined || comp.type === 'button') {
+                const isButton = comp.type === 'button';
+                const currentHref = comp.href || '';
+                html += `<div>
+                    <label class="block text-[11px] text-slate-400 mb-1">${isButton ? '🔗 リンク先URL（設定するとボタンがリンクになります）' : 'リンクURL'}</label>
+                    <input type="text" value="${escapeAttr(currentHref)}" onchange="updateProp('href', this.value)"
+                        placeholder="${isButton ? 'https://example.com または #section' : ''}"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs focus:outline-none focus:border-indigo-500">
+                    ${isButton ? `
+                    <label class="block text-[11px] text-slate-400 mb-1 mt-2">開き方</label>
+                    <select onchange="updateProp('target', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs">
+                        <option value="_self" ${comp.target !== '_blank' ? 'selected' : ''}>同じタブ</option>
+                        <option value="_blank" ${comp.target === '_blank' ? 'selected' : ''}>新しいタブで開く</option>
+                    </select>
+                    <p class="text-[10px] text-slate-500 mt-1">空欄にすると通常のボタン（クリックイベント用）になります</p>
+                    ` : ''}
+                </div>`;
+            }
+            if (comp.type === 'heading') {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">見出しレベル</label>
+                    <select onchange="updateProp('level', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs">
+                        <option value="h1" ${comp.level==='h1'?'selected':''}>H1</option>
+                        <option value="h2" ${comp.level==='h2'?'selected':''}>H2</option>
+                        <option value="h3" ${comp.level==='h3'?'selected':''}>H3</option>
+                        <option value="h4" ${comp.level==='h4'?'selected':''}>H4</option>
+                    </select></div>`;
+            }
+            if (comp.type === 'list') {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">リスト項目 (1行1項目)</label>
+                    <textarea onchange="updateListItems(this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs h-20">${(comp.items||[]).join('\n')}</textarea>
+                    <select onchange="updateProp('listType', this.value)" class="mt-1 w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                        <option value="ul" ${comp.listType!=='ol'?'selected':''}>箇条書き</option>
+                        <option value="ol" ${comp.listType==='ol'?'selected':''}>番号付き</option>
+                    </select></div>`;
+            }
+            if (comp.type === 'icon') {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">アイコンクラス (FontAwesome)</label>
+                    <input type="text" value="${escapeAttr(comp.iconClass||'')}" onchange="updateProp('iconClass', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs" placeholder="fa-solid fa-star">
+                    <label class="block text-[11px] text-slate-400 mb-1 mt-2">サイズ</label>
+                    <input type="text" value="${comp.iconSize||'32px'}" onchange="updateProp('iconSize', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs"></div>`;
+            }
+            if (comp.type === 'spacer') {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">高さ</label>
+                    <input type="text" value="${comp.height||'40px'}" onchange="updateProp('height', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs"></div>`;
+            }
+            if (comp.type === 'navbar') {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">ブランド名</label>
+                    <input type="text" value="${escapeAttr(comp.brand||'')}" onchange="updateProp('brand', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs">
+                    <label class="block text-[11px] text-slate-400 mb-1 mt-2">リンク (カンマ区切り)</label>
+                    <input type="text" value="${(comp.links||[]).join(', ')}" onchange="updateProp('links', this.value.split(',').map(s=>s.trim()))"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs"></div>`;
+            }
+            if (comp.type === 'hero') {
+                // already have content + subtitle
+            }
+            if (comp.embedUrl !== undefined) {
+                html += `<div><label class="block text-[11px] text-slate-400 mb-1">埋め込みURL</label>
+                    <input type="text" value="${escapeAttr(comp.embedUrl)}" onchange="updateProp('embedUrl', this.value)"
+                        class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs"></div>`;
+            }
+
+            // Styles section
+            html += `<div class="border-t border-slate-700 pt-3">
+                <div class="font-bold text-slate-300 text-[11px] mb-2 flex items-center"><i class="fa-solid fa-palette mr-1 text-pink-400"></i> スタイル</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">文字色</label>
+                        <input type="color" value="${styles.color || '#000000'}" onchange="updateStyle('color', this.value)" class="w-full h-8 bg-slate-700 border border-slate-600 rounded cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">背景色</label>
+                        <input type="color" value="${(styles.backgroundColor === 'transparent' || !styles.backgroundColor) ? '#ffffff' : styles.backgroundColor}" onchange="updateStyle('backgroundColor', this.value)" class="w-full h-8 bg-slate-700 border border-slate-600 rounded cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">文字サイズ</label>
+                        <input type="text" value="${styles.fontSize || '16px'}" onchange="updateStyle('fontSize', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">太さ</label>
+                        <select onchange="updateStyle('fontWeight', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            <option value="400" ${styles.fontWeight==='400'||!styles.fontWeight?'selected':''}>標準</option>
+                            <option value="500" ${styles.fontWeight==='500'?'selected':''}>中</option>
+                            <option value="600" ${styles.fontWeight==='600'?'selected':''}>やや太</option>
+                            <option value="700" ${styles.fontWeight==='700'?'selected':''}>太字</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">角丸</label>
+                        <input type="text" value="${styles.borderRadius || '6px'}" onchange="updateStyle('borderRadius', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">余白 (padding)</label>
+                        <input type="text" value="${styles.padding || '8px'}" onchange="updateStyle('padding', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">外側余白</label>
+                        <input type="text" value="${styles.margin || '0'}" onchange="updateStyle('margin', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">配置</label>
+                        <select onchange="updateStyle('textAlign', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            <option value="left" ${styles.textAlign==='left'?'selected':''}>左</option>
+                            <option value="center" ${styles.textAlign==='center'?'selected':''}>中央</option>
+                            <option value="right" ${styles.textAlign==='right'?'selected':''}>右</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">幅</label>
+                        <input type="text" value="${styles.width || '100%'}" onchange="updateStyle('width', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-400 mb-1">高さ</label>
+                        <input type="text" value="${styles.height || 'auto'}" onchange="updateStyle('height', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-[10px] text-slate-400 mb-1">影 (box-shadow)</label>
+                        <input type="text" value="${styles.boxShadow || ''}" onchange="updateStyle('boxShadow', this.value)" placeholder="例: 0 4px 12px rgba(0,0,0,0.1)"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-[10px] text-slate-400 mb-1">ボーダー</label>
+                        <input type="text" value="${styles.border || ''}" onchange="updateStyle('border', this.value)" placeholder="例: 1px solid #e2e8f0"
+                            class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                    </div>
+                </div>
+
+                <!-- 固定表示 / Position -->
+                <div class="mt-3 pt-3 border-t border-slate-700">
+                    <div class="font-bold text-slate-300 text-[11px] mb-2 flex items-center justify-between">
+                        <span><i class="fa-solid fa-thumbtack mr-1 text-amber-400"></i> 固定表示 (スクロールしても残る)</span>
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">ポジション</label>
+                            <select onchange="updateStyle('position', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-slate-100 text-xs">
+                                <option value="static" ${!styles.position || styles.position==='static'?'selected':''}>通常 (static)</option>
+                                <option value="relative" ${styles.position==='relative'?'selected':''}>相対 (relative)</option>
+                                <option value="absolute" ${styles.position==='absolute'?'selected':''}>絶対 (absolute)</option>
+                                <option value="fixed" ${styles.position==='fixed'?'selected':''}>画面固定 (fixed) ★</option>
+                                <option value="sticky" ${styles.position==='sticky'?'selected':''}>スクロール追従 (sticky)</option>
+                            </select>
+                        </div>
+                        ${(styles.position === 'fixed' || styles.position === 'absolute' || styles.position === 'sticky') ? `
+                        <div class="grid grid-cols-2 gap-2 bg-slate-900/50 p-2 rounded border border-slate-600">
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">上 (top)</label>
+                                <input type="text" value="${styles.top || ''}" onchange="updateStyle('top', this.value)" placeholder="例: 20px または 0"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">右 (right)</label>
+                                <input type="text" value="${styles.right || ''}" onchange="updateStyle('right', this.value)" placeholder="例: 20px"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">下 (bottom)</label>
+                                <input type="text" value="${styles.bottom || ''}" onchange="updateStyle('bottom', this.value)" placeholder="例: 20px"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-400 mb-1">左 (left)</label>
+                                <input type="text" value="${styles.left || ''}" onchange="updateStyle('left', this.value)" placeholder="例: 20px"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-[10px] text-slate-400 mb-1">重ね順 (z-index)</label>
+                                <input type="text" value="${styles.zIndex || ''}" onchange="updateStyle('zIndex', this.value)" placeholder="例: 1000"
+                                    class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 mt-1">
+                            <button type="button" onclick="applyFixedPreset('top-left')" class="text-[10px] bg-slate-700 hover:bg-slate-600 border border-slate-600 px-2 py-1 rounded text-slate-200">左上</button>
+                            <button type="button" onclick="applyFixedPreset('top-right')" class="text-[10px] bg-slate-700 hover:bg-slate-600 border border-slate-600 px-2 py-1 rounded text-slate-200">右上</button>
+                            <button type="button" onclick="applyFixedPreset('bottom-left')" class="text-[10px] bg-slate-700 hover:bg-slate-600 border border-slate-600 px-2 py-1 rounded text-slate-200">左下</button>
+                            <button type="button" onclick="applyFixedPreset('bottom-right')" class="text-[10px] bg-slate-700 hover:bg-slate-600 border border-slate-600 px-2 py-1 rounded text-slate-200">右下</button>
+                            <button type="button" onclick="applyFixedPreset('bottom-center')" class="text-[10px] bg-slate-700 hover:bg-slate-600 border border-slate-600 px-2 py-1 rounded text-slate-200">下中央</button>
+                        </div>
+                        <p class="text-[10px] text-amber-400/80">※ デザイン画面では通常位置に表示されます。プレビューで固定動作を確認してください。</p>
+                        ` : `
+                        <p class="text-[10px] text-slate-500">「画面固定 (fixed)」を選ぶと位置指定ができます</p>
+                        `}
+                    </div>
+                </div>
+                `;
+
+            // Flex options for row
+            if (comp.type === 'row') {
+                html += `<div class="mt-3 pt-2 border-t border-slate-700">
+                    <div class="font-bold text-slate-300 text-[11px] mb-2">Flex 設定</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">gap</label>
+                            <input type="text" value="${styles.gap || '16px'}" onchange="updateStyle('gap', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">折り返し</label>
+                            <select onchange="updateStyle('flexWrap', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                                <option value="wrap" ${styles.flexWrap!=='nowrap'?'selected':''}>あり</option>
+                                <option value="nowrap" ${styles.flexWrap==='nowrap'?'selected':''}>なし</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">主軸配置</label>
+                            <select onchange="updateStyle('justifyContent', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                                <option value="flex-start">開始</option>
+                                <option value="center">中央</option>
+                                <option value="space-between">両端</option>
+                                <option value="space-around">均等</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-400 mb-1">交差軸</label>
+                            <select onchange="updateStyle('alignItems', this.value)" class="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-100 text-xs">
+                                <option value="stretch">伸縮</option>
+                                <option value="center">中央</option>
+                                <option value="flex-start">上</option>
+                                <option value="flex-end">下</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            html += `</div></div>`;
+            panel.innerHTML = html;
+        }
+
+        function escapeAttr(str) {
+            return String(str || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        }
+
+        function updateProp(key, value) {
+            if (!selectedElementId) return;
+            saveState();
+            const found = findComponent(selectedElementId);
+            if (found) {
+                found.comp[key] = value;
+                renderCanvas();
+                // keep selection
+                selectElement(selectedElementId);
+            }
+        }
+        function updateStyle(key, value) {
+            if (!selectedElementId) return;
+            saveState();
+            const found = findComponent(selectedElementId);
+            if (found) {
+                if (!found.comp.styles) found.comp.styles = {};
+                found.comp.styles[key] = value;
+                // Clear conflicting offsets when switching away from fixed/absolute
+                if (key === 'position' && value === 'static') {
+                    delete found.comp.styles.top;
+                    delete found.comp.styles.right;
+                    delete found.comp.styles.bottom;
+                    delete found.comp.styles.left;
+                    delete found.comp.styles.zIndex;
+                }
+                renderCanvas();
+                selectElement(selectedElementId);
+            }
+        }
+
+        function applyFixedPreset(preset) {
+            if (!selectedElementId) return;
+            saveState();
+            const found = findComponent(selectedElementId);
+            if (!found) return;
+            if (!found.comp.styles) found.comp.styles = {};
+            const s = found.comp.styles;
+            s.position = 'fixed';
+            s.zIndex = '1000';
+            // Reset offsets first
+            delete s.top; delete s.right; delete s.bottom; delete s.left;
+            // Make width auto if it was 100% so floating buttons look better
+            if (s.width === '100%' || !s.width) s.width = 'auto';
+
+            switch (preset) {
+                case 'top-left':
+                    s.top = '20px'; s.left = '20px'; break;
+                case 'top-right':
+                    s.top = '20px'; s.right = '20px'; break;
+                case 'bottom-left':
+                    s.bottom = '20px'; s.left = '20px'; break;
+                case 'bottom-right':
+                    s.bottom = '20px'; s.right = '20px'; break;
+                case 'bottom-center':
+                    s.bottom = '20px'; s.left = '50%';
+                    s.transform = 'translateX(-50%)';
+                    break;
+            }
+            renderCanvas();
+            selectElement(selectedElementId);
+        }
+
+        function updateListItems(text) {
+            updateProp('items', text.split('\n').filter(s => s.trim()));
+        }
+
+        // ===================== PAGES =====================
+        function renderPageSelector() {
+            const selector = document.getElementById('page-selector');
+            selector.innerHTML = '';
+            Object.keys(project.pages).forEach(key => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = `${project.pages[key].title} (${key})`;
+                if (key === project.activePage) opt.selected = true;
+                selector.appendChild(opt);
+            });
+            document.getElementById('canvas-page-title').textContent = `Page: ${project.activePage}`;
+        }
+        function changePage(key) {
+            saveState();
+            project.activePage = key;
+            selectedElementId = null;
+            renderCanvas();
+            renderPropertiesPanel();
+            renderPageSelector();
+            applyPageVisualSettings();
+        }
+        function addNewPage() {
+            const pageId = prompt('新しいページのID (例: about):');
+            if (!pageId) return;
+            const cleanId = pageId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            if (!cleanId || project.pages[cleanId]) {
+                alert('有効でユニークなIDを入力してください');
+                return;
+            }
+            const pageTitle = prompt('表示タイトル:', cleanId) || cleanId;
+            saveState();
+            project.pages[cleanId] = {
+                title: pageTitle,
+                components: [],
+                settings: {
+                    backgroundColor: '#ffffff',
+                    maxWidth: '100%',
+                    padding: '24px',
+                    fontFamily: "'Zen Kaku Gothic New', sans-serif"
+                }
+            };
+            changePage(cleanId);
+        }
+
+        function openPageSettings() {
+            const page = getActivePage();
+            document.getElementById('ps-title').value = page.title;
+            document.getElementById('ps-bg').value = page.settings?.backgroundColor || '#ffffff';
+            document.getElementById('ps-maxw').value = page.settings?.maxWidth || '100%';
+            document.getElementById('ps-pad').value = page.settings?.padding || '24px';
+            document.getElementById('ps-font').value = page.settings?.fontFamily || "'Zen Kaku Gothic New', sans-serif";
+            document.getElementById('page-settings-modal').classList.remove('hidden');
+        }
+        function closePageSettings() {
+            document.getElementById('page-settings-modal').classList.add('hidden');
+        }
+        function applyPageSettings() {
+            saveState();
+            const page = getActivePage();
+            page.title = document.getElementById('ps-title').value;
+            page.settings = {
+                backgroundColor: document.getElementById('ps-bg').value,
+                maxWidth: document.getElementById('ps-maxw').value,
+                padding: document.getElementById('ps-pad').value,
+                fontFamily: document.getElementById('ps-font').value
+            };
+            closePageSettings();
+            renderPageSelector();
+            renderCanvas();
+        }
+        function applyPageVisualSettings() {
+            // already applied in renderCanvas
+        }
+
+        // ===================== VIEWPORT / MODE =====================
+        function setViewport(mode) {
+            currentViewport = mode;
+            const container = document.getElementById('viewport-container');
+            const previewIframe = document.getElementById('preview-iframe');
+            const badge = document.getElementById('viewport-dimensions-badge');
+            document.querySelectorAll('#vp-desktop, #vp-tablet, #vp-mobile').forEach(b => {
+                b.classList.remove('bg-slate-700', 'text-white');
+            });
+            if (mode === 'desktop') {
+                container.style.width = '100%';
+                if (previewIframe) previewIframe.style.width = '100%';
+                document.getElementById('vp-desktop').classList.add('bg-slate-700', 'text-white');
+                badge.textContent = '100% Fluid / Desktop';
+            } else if (mode === 'tablet') {
+                container.style.width = '768px';
+                if (previewIframe) previewIframe.style.width = '768px';
+                document.getElementById('vp-tablet').classList.add('bg-slate-700', 'text-white');
+                badge.textContent = '768px / Tablet';
+            } else {
+                container.style.width = '375px';
+                if (previewIframe) previewIframe.style.width = '375px';
+                document.getElementById('vp-mobile').classList.add('bg-slate-700', 'text-white');
+                badge.textContent = '375px / Mobile';
+            }
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            ['design','blocks','preview'].forEach(m => {
+                document.getElementById(`workspace-${m}`).classList.add('hidden');
+                document.getElementById(`mode-${m}-btn`).className = 'px-3 py-1.5 rounded-md flex items-center space-x-1.5 text-slate-400 hover:text-white transition';
+            });
+            document.getElementById(`workspace-${mode}`).classList.remove('hidden');
+            if (mode === 'design') {
+                document.getElementById('mode-design-btn').className = 'px-3 py-1.5 rounded-md flex items-center space-x-1.5 bg-indigo-600 text-white shadow';
+            } else if (mode === 'blocks') {
+                document.getElementById('mode-blocks-btn').className = 'px-3 py-1.5 rounded-md flex items-center space-x-1.5 bg-amber-600 text-white shadow';
+                renderBlocksWorkspace();
+            } else {
+                document.getElementById('mode-preview-btn').className = 'px-3 py-1.5 rounded-md flex items-center space-x-1.5 bg-emerald-600 text-white shadow';
+                reloadPreview();
+            }
+        }
+
+        // ===================== BLOCKS (kept from original, simplified) =====================
+        const BLOCK_TEMPLATES = [
+            { id: 'evt_click', cat: 'event', color: 'bg-block-event', label: '⚡ 要素 [TARGET] がクリックされたとき', target: '', code: 'document.getElementById("[TARGET]")?.addEventListener("click", function(e) {\n  [BODY]\n});' },
+            { id: 'evt_load', cat: 'event', color: 'bg-block-event', label: '🚀 ページが開かれたとき', code: 'window.addEventListener("DOMContentLoaded", function() {\n  [BODY]\n});' },
+            { id: 'ui_set_text', cat: 'ui', color: 'bg-block-ui', label: '💬 要素 [TARGET] の文字を [TEXT] に変える', target: '', text: 'こんにちは', code: 'if(document.getElementById("[TARGET]")) document.getElementById("[TARGET]").innerText = "[TEXT]";' },
+            { id: 'ui_set_css', cat: 'ui', color: 'bg-block-style', label: '🎨 要素 [TARGET] のCSS [PROP] を [VAL] に', target: '', prop: 'background-color', val: '#10b981', code: 'if(document.getElementById("[TARGET]")) document.getElementById("[TARGET]").style["[PROP]"] = "[VAL]";' },
+            { id: 'ui_popup', cat: 'ui', color: 'bg-block-ui', label: '💬 ポップアップで [MSG] と表示', msg: '押されました！', code: 'alert("[MSG]");' },
+            { id: 'ctrl_if', cat: 'control', color: 'bg-block-control', label: '❓ もし [COND] ならば', cond: 'true', code: 'if([COND]) {\n  [BODY]\n}' },
+            { id: 'var_set', cat: 'var', color: 'bg-block-var', label: '🔢 変数 [VAR] を [VAL] にセット', var: 'count', val: '0', code: 'window["[VAR]"] = [VAL];' },
+            { id: 'net_fetch', cat: 'net', color: 'bg-block-net', label: '🌐 API [URL] から取得して [TARGET] に表示', url: 'https://api.github.com', target: '', code: 'fetch("[URL]").then(r=>r.text()).then(d=>{if(document.getElementById("[TARGET]")) document.getElementById("[TARGET]").innerText=d.substring(0,120);});' },
+            { id: 'sensor_gps', cat: 'sensor', color: 'bg-block-sensor', label: '📍 GPSを [TARGET] に表示', target: '', code: 'navigator.geolocation.getCurrentPosition(p=>{if(document.getElementById("[TARGET]")) document.getElementById("[TARGET]").innerText=`緯度:${p.coords.latitude}, 経度:${p.coords.longitude}`;});' }
+        ];
+
+        function filterBlockCategory(cat) { renderBlockTemplates(cat); }
+        function renderBlockTemplates(category = 'all') {
+            const container = document.getElementById('block-templates-list');
+            container.innerHTML = '';
+            const filtered = category === 'all' ? BLOCK_TEMPLATES : BLOCK_TEMPLATES.filter(b => b.cat === category);
+            filtered.forEach(tmpl => {
+                const item = document.createElement('div');
+                item.className = `p-3 ${tmpl.color} font-bold rounded shadow cursor-pointer text-xs flex items-center justify-between`;
+                item.onclick = () => addBlockToWorkspace(tmpl.id);
+                item.innerHTML = `<span>${tmpl.label.replace(/\[(.*?)\]/g, '<span class="bg-black/20 px-1 py-0.5 rounded text-[10px] m-0.5">$1</span>')}</span><i class="fa-solid fa-plus text-xs ml-2 opacity-70"></i>`;
+                container.appendChild(item);
+            });
+        }
+        function addBlockToWorkspace(templateId) {
+            saveState();
+            const tmpl = BLOCK_TEMPLATES.find(b => b.id === templateId);
+            if (!tmpl) return;
+            const instance = JSON.parse(JSON.stringify(tmpl));
+            instance.instanceId = `blk_${Date.now().toString(36)}`;
+            project.blocks.push(instance);
+            renderBlocksWorkspace();
+        }
+        function renderBlocksWorkspace() {
+            const container = document.getElementById('blocks-script-workspace');
+            if (!project.blocks.length) {
+                container.innerHTML = `<div class="text-slate-500 text-center py-20"><i class="fa-solid fa-cubes-stacked text-3xl mb-2 text-slate-600 block"></i>左側からブロックを追加してください</div>`;
+                generateJavaScriptCode();
+                return;
+            }
+            container.innerHTML = '';
+            project.blocks.forEach(blk => {
+                const node = document.createElement('div');
+                node.className = `p-3 ${blk.color} font-bold rounded-lg shadow text-xs relative flex items-center justify-between space-x-2 border border-white/20`;
+                let labelHtml = blk.label;
+                const comps = flattenComponents(getActivePage().components);
+                if (labelHtml.includes('[TARGET]')) {
+                    let sel = `<select onchange="updateBlockParam('${blk.instanceId}','target',this.value)" class="bg-black/30 text-white rounded px-1.5 py-0.5 text-[11px]">`;
+                    comps.forEach(c => sel += `<option value="${c.id}" ${blk.target===c.id?'selected':''}>#${c.id.split('_').pop()} (${c.type})</option>`);
+                    if (!comps.length) sel += `<option value="">(なし)</option>`;
+                    sel += `</select>`;
+                    labelHtml = labelHtml.replace('[TARGET]', sel);
+                }
+                ['TEXT','MSG','PROP','VAL','URL','VAR','COND'].forEach(k => {
+                    const key = k.toLowerCase();
+                    if (labelHtml.includes(`[${k}]`)) {
+                        labelHtml = labelHtml.replace(`[${k}]`, `<input type="text" value="${blk[key]||''}" onchange="updateBlockParam('${blk.instanceId}','${key}',this.value)" class="bg-black/30 text-white rounded px-1.5 py-0.5 text-[11px] w-20 outline-none">`);
+                    }
+                });
+                node.innerHTML = `<div class="flex items-center space-x-2"><div>${labelHtml}</div></div>
+                    <button onclick="removeBlock('${blk.instanceId}')" class="text-white/70 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>`;
+                container.appendChild(node);
+            });
+            generateJavaScriptCode();
+        }
+        function flattenComponents(list, acc = []) {
+            list.forEach(c => {
+                acc.push(c);
+                if (c.children) flattenComponents(c.children, acc);
+            });
+            return acc;
+        }
+        function updateBlockParam(id, key, val) {
+            const blk = project.blocks.find(b => b.instanceId === id);
+            if (blk) { blk[key] = val; generateJavaScriptCode(); }
+        }
+        function removeBlock(id) {
+            saveState();
+            project.blocks = project.blocks.filter(b => b.instanceId !== id);
+            renderBlocksWorkspace();
+        }
+        function clearBlocks() {
+            if (confirm('すべてのブロックを消去しますか？')) {
+                saveState();
+                project.blocks = [];
+                renderBlocksWorkspace();
+            }
+        }
+        function generateJavaScriptCode() {
+            let code = '// WebCraft generated logic\n';
+            project.blocks.forEach(blk => {
+                let snippet = blk.code || '';
+                ['TARGET','TEXT','MSG','PROP','VAL','URL','KEY','VAR','TIMES','COND'].forEach(k => {
+                    snippet = snippet.replace(new RegExp(`\\[${k}\\]`, 'g'), blk[k.toLowerCase()] || '');
+                });
+                snippet = snippet.replace('[BODY]', '// 処理');
+                code += snippet + '\n\n';
+            });
+            document.getElementById('generated-js-code').textContent = code;
+            return code;
+        }
+
+        // ===================== EXPORT / PREVIEW =====================
+        function generateCompleteHTML() {
+            const page = getActivePage();
+            const settings = page.settings || {};
+            let bodyContent = '';
+
+            function renderCompHTML(comp) {
+                const styleAttr = Object.entries(comp.styles || {}).map(([k, v]) => {
+                    const cssKey = k.replace(/([A-Z])/g, '-$1').toLowerCase();
+                    return `${cssKey}:${v}`;
+                }).join(';');
+                let nodeStr = '';
+                switch (comp.type) {
+                    case 'heading':
+                        nodeStr = `<${comp.level||'h2'} id="${comp.id}" style="${styleAttr}">${comp.content||''}</${comp.level||'h2'}>`;
+                        break;
+                    case 'paragraph':
+                        nodeStr = `<p id="${comp.id}" style="${styleAttr}">${comp.content||''}</p>`;
+                        break;
+                    case 'button':
+                        if (comp.href) {
+                            const targetAttr = comp.target === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
+                            nodeStr = `<a id="${comp.id}" href="${comp.href}"${targetAttr} style="${styleAttr}">${comp.content||''}</a>`;
+                        } else {
+                            nodeStr = `<button id="${comp.id}" style="${styleAttr}">${comp.content||''}</button>`;
+                        }
+                        break;
+                    case 'link':
+                        nodeStr = `<a id="${comp.id}" href="${comp.href||'#'}" style="${styleAttr}">${comp.content||''}</a>`;
+                        break;
+                    case 'list':
+                        const tag = comp.listType === 'ol' ? 'ol' : 'ul';
+                        nodeStr = `<${tag} id="${comp.id}" style="${styleAttr};padding-left:1.5rem">${(comp.items||[]).map(i=>`<li>${i}</li>`).join('')}</${tag}>`;
+                        break;
+                    case 'image':
+                        nodeStr = `<img id="${comp.id}" src="${comp.src}" alt="${comp.alt||''}" style="${styleAttr}" />`;
+                        break;
+                    case 'video':
+                        nodeStr = `<video id="${comp.id}" src="${comp.src}" controls style="${styleAttr}"></video>`;
+                        break;
+                    case 'audio':
+                        nodeStr = `<audio id="${comp.id}" src="${comp.src}" controls style="${styleAttr}"></audio>`;
+                        break;
+                    case 'icon':
+                        nodeStr = `<div id="${comp.id}" style="${styleAttr}"><i class="${comp.iconClass||'fa-solid fa-star'}" style="font-size:${comp.iconSize||'32px'}"></i></div>`;
+                        break;
+                    case 'spacer':
+                        nodeStr = `<div id="${comp.id}" style="height:${comp.height||'40px'};${styleAttr}"></div>`;
+                        break;
+                    case 'divider':
+                        nodeStr = `<hr id="${comp.id}" style="${styleAttr}" />`;
+                        break;
+                    case 'input':
+                        nodeStr = `<input id="${comp.id}" type="text" placeholder="${comp.placeholder||''}" style="${styleAttr}" />`;
+                        break;
+                    case 'textarea':
+                        nodeStr = `<textarea id="${comp.id}" placeholder="${comp.placeholder||''}" rows="${comp.rows||4}" style="${styleAttr}"></textarea>`;
+                        break;
+                    case 'table':
+                        let tableRows = (comp.data||[]).map((row,ri) => {
+                            const cells = row.map(c => ri===0 ? `<th style="border:1px solid #e2e8f0;padding:8px 12px;background:#f1f5f9">${c}</th>` : `<td style="border:1px solid #e2e8f0;padding:8px 12px">${c}</td>`).join('');
+                            return `<tr>${cells}</tr>`;
+                        }).join('');
+                        nodeStr = `<table id="${comp.id}" style="${styleAttr};border-collapse:collapse;width:100%">${tableRows}</table>`;
+                        break;
+                    case 'map':
+                        nodeStr = `<iframe id="${comp.id}" src="${comp.embedUrl}" width="100%" height="280" style="border:0;${styleAttr}" loading="lazy"></iframe>`;
+                        break;
+                    case 'gamecanvas':
+                        nodeStr = `<canvas id="${comp.id}" width="${comp.width||480}" height="${comp.height||320}" style="${styleAttr}"></canvas>`;
+                        break;
+                    case 'hero':
+                        nodeStr = `<div id="${comp.id}" style="${styleAttr}"><div>${comp.content||''}</div><div style="font-size:18px;font-weight:400;margin-top:12px;opacity:0.9">${comp.subtitle||''}</div></div>`;
+                        break;
+                    case 'navbar':
+                        const linksHtml = (comp.links||[]).map(l => `<span style="opacity:0.9;font-size:14px">${l}</span>`).join('');
+                        nodeStr = `<div id="${comp.id}" style="${styleAttr}"><span style="font-weight:700;font-size:18px">${comp.brand||'Brand'}</span><div style="display:flex;gap:20px">${linksHtml}</div></div>`;
+                        break;
+                    case 'footer':
+                        nodeStr = `<div id="${comp.id}" style="${styleAttr}">${comp.content||''}</div>`;
+                        break;
+                    case 'container':
+                    case 'row':
+                    case 'card':
+                        const childrenHtml = (comp.children||[]).map(renderCompHTML).join('\n');
+                        nodeStr = `<div id="${comp.id}" style="${styleAttr}">${childrenHtml}</div>`;
+                        break;
+                }
+                return nodeStr;
+            }
+
+            page.components.forEach(c => { bodyContent += renderCompHTML(c) + '\n'; });
+
+            const scriptCode = generateJavaScriptCode();
+            return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${project.title} - ${page.title}</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body {
+      font-family: ${settings.fontFamily || 'sans-serif'};
+      margin: 0;
+      padding: ${settings.padding || '24px'};
+      background-color: ${settings.backgroundColor || '#ffffff'};
+      max-width: ${settings.maxWidth || '100%'};
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+    }
+    * { box-sizing: border-box; }
+  </style>
+</head>
+<body>
+${bodyContent}
+<script>
+${scriptCode}
+<\/script>
+</body>
+</html>`;
+        }
+
+        function reloadPreview() {
+            const iframe = document.getElementById('preview-iframe');
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(generateCompleteHTML());
+            doc.close();
+        }
+
+        // ===================== ASSETS =====================
+        function openAssetManager() {
+            renderAssetsList();
+            document.getElementById('asset-modal').classList.remove('hidden');
+        }
+        function closeAssetManager() {
+            document.getElementById('asset-modal').classList.add('hidden');
+        }
+        function handleAssetUpload(event) {
+            Array.from(event.target.files || []).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    project.assets.push({ name: file.name, type: file.type, dataUrl: e.target.result });
+                    renderAssetsList();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        function renderAssetsList() {
+            const container = document.getElementById('assets-list');
+            if (!project.assets.length) {
+                container.innerHTML = `<p class="text-slate-400 text-center py-4">アセットなし</p>`;
+                return;
+            }
+            container.innerHTML = project.assets.map((a, i) => `
+                <div class="bg-slate-700/60 p-2 rounded flex items-center justify-between text-xs">
+                    <div class="flex items-center space-x-2 truncate">
+                        <i class="fa-solid fa-file text-indigo-400"></i>
+                        <span class="truncate text-slate-200">${a.name}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="navigator.clipboard.writeText('${a.dataUrl}');alert('コピーしました')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-0.5 rounded text-[10px]">URL</button>
+                        <button onclick="project.assets.splice(${i},1);renderAssetsList()" class="text-rose-400"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>`).join('');
+        }
+
+        // ===================== SAVE / LOAD / EXPORT =====================
+        function saveProjectJSON() {
+            const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+            saveAs(blob, `${project.title.replace(/\s+/g, '_')}_project.json`);
+        }
+        function triggerProjectLoad() {
+            document.getElementById('project-file-input').click();
+        }
+        function loadProjectJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    project = JSON.parse(ev.target.result);
+                    // Ensure settings exist
+                    Object.values(project.pages).forEach(p => {
+                        if (!p.settings) p.settings = { backgroundColor: '#ffffff', maxWidth: '100%', padding: '24px', fontFamily: "'Zen Kaku Gothic New', sans-serif" };
+                    });
+                    selectedElementId = null;
+                    document.getElementById('project-title').value = project.title || 'WebCraft Project';
+                    refreshAll();
+                    alert('プロジェクトを読み込みました');
+                } catch (err) {
+                    alert('読み込みに失敗しました');
+                }
+            };
+            reader.readAsText(file);
+        }
+        function exportSingleHTML() {
+            const blob = new Blob([generateCompleteHTML()], { type: 'text/html;charset=utf-8' });
+            saveAs(blob, `${project.activePage}.html`);
+        }
+        function exportZIPPackage() {
+            const zip = new JSZip();
+            zip.file('index.html', generateCompleteHTML());
+            if (project.assets.length) {
+                const folder = zip.folder('assets');
+                project.assets.forEach(a => {
+                    const b64 = a.dataUrl.split(',')[1];
+                    if (b64) folder.file(a.name, b64, { base64: true });
+                });
+            }
+            zip.generateAsync({ type: 'blob' }).then(content => {
+                saveAs(content, `${project.title}_website.zip`);
+            });
+        }
+
+        // ===================== INIT =====================
+        window.onload = function() {
+            renderComponentPalette();
+            renderPageSelector();
+            renderCanvas();
+            renderBlockTemplates();
+            renderBlocksWorkspace();
+            document.getElementById('project-title').addEventListener('input', e => { project.title = e.target.value; });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', e => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+                if (e.ctrlKey || e.metaKey) {
+                    if (e.key === 'z') { e.preventDefault(); undo(); }
+                    if (e.key === 'y') { e.preventDefault(); redo(); }
+                    if (e.key === 'd') { e.preventDefault(); duplicateSelected(); }
+                }
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (selectedElementId) { e.preventDefault(); deleteSelectedElement(); }
+                }
+            });
+        };
+    </script>
+</body>
+</html>

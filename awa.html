@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open and Move Multiple Windows</title>
+</head>
+<body>
+    <p>5つのウィンドウを開いて、高速で動かしています...</p>
+    <p>もし開かない場合は、ブラウザのポップアップブロックを解除してから、以下のリンクをクリックしてください。</p>
+    <p><a href="#" id="openLink">ウィンドウをまとめて手動で開く</a></p>
+
+    <script>
+        const targetUrl = 'https://uiui.puter.com/awa.html';
+        const width = 480;
+        const height = 360;
+        const windowFeatures = `width=${width},height=${height},resizable=yes,scrollbars=yes,status=yes`;
+        
+        // 生成するウィンドウの数
+        const windowCount = 5;
+        const windows = [];
+
+        function openAndMoveWindows() {
+            // すでに動いているものがあれば一旦クリア
+            windows.forEach(w => {
+                if (w.interval) clearInterval(w.interval);
+            });
+            windows.length = 0;
+
+            for (let i = 0; i < windowCount; i++) {
+                // それぞれ初期の移動速度と方向をランダムに設定（速めに設定）
+                let dx = (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 10) + 12); // 12〜21pxの高速移動
+                let dy = (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 10) + 12);
+
+                const childWin = window.open(targetUrl, `_blank_${i}_${Date.now()}`, windowFeatures);
+                
+                if (childWin) {
+                    const winObj = {
+                        win: childWin,
+                        dx: dx,
+                        dy: dy,
+                        interval: null
+                    };
+
+                    // 高速（16ミリ秒＝約60fps）で位置を更新して移動させる
+                    winObj.interval = setInterval(() => {
+                        if (!winObj.win || winObj.win.closed) {
+                            clearInterval(winObj.interval);
+                            return;
+                        }
+
+                        try {
+                            // ウィンドウを動かす
+                            winObj.win.moveBy(winObj.dx, winObj.dy);
+
+                            // 定期的にランダムで方向転換させて画面内を跳ね回るようにする
+                            if (Math.random() < 0.05) {
+                                winObj.dx = -winObj.dx;
+                            }
+                            if (Math.random() < 0.05) {
+                                winObj.dy = -winObj.dy;
+                            }
+                        } catch (e) {
+                            // クロスドメイン制限下でも安全に動かすためのフォールバック
+                            winObj.win.moveBy(winObj.dx, winObj.dy);
+                        }
+                    }, 16); // 16ms間隔で非常に滑らかかつ高速に動かします
+
+                    windows.push(winObj);
+                }
+            }
+        }
+
+        // 開いた瞬間に実行
+        openAndMoveWindows();
+
+        // ページ読み込み完了時にも実行
+        window.onload = openAndMoveWindows;
+
+        // 手動用リンク
+        document.getElementById('openLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            openAndMoveWindows();
+        });
+    </script>
+</body>
+</html>

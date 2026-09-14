@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Slas Slides - PowerPoint Style Web App</title>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js for Graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Ribbon Tab Styling */
+        .ribbon-tab.active {
+            border-bottom: 3px solid #f59e0b;
+            color: #b45309;
+            font-weight: 600;
+            background-color: #ffffff;
+        }
+
+        /* Keyframe Animations for Slides/Objects */
+        @keyframes animFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes animSlideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes animZoomIn {
+            from { transform: scale(0.3); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes animBounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-30px); }
+            60% { transform: translateY(-15px); }
+        }
+
+        .anim-fade { animation: animFadeIn 0.8s ease forwards; }
+        .anim-slide { animation: animSlideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .anim-zoom { animation: animZoomIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .anim-bounce { animation: animBounce 1s ease forwards; }
+
+        /* Handle styling for resizing - enlarge touch target area for mobile */
+        .resize-handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background-color: #f59e0b;
+            border: 2px solid #ffffff;
+            border-radius: 3px;
+            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+            z-index: 25;
+            touch-action: none;
+        }
+
+        /* Presentation Canvas Aspect Ratio */
+        .slide-aspect {
+            aspect-ratio: 16 / 9;
+        }
+
+        /* Mobile View Tabs */
+        .mobile-view-btn.active {
+            background-color: #f59e0b;
+            color: #ffffff;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+    <!-- TOP HEADER -->
+    <header class="bg-amber-600 text-white px-3 sm:px-4 py-2 flex items-center justify-between shadow-md z-20 shrink-0">
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <div class="bg-white text-amber-600 font-black px-2 py-0.5 sm:px-2.5 sm:py-1 rounded shadow text-base sm:text-lg tracking-wider">SLAS</div>
+            <span class="font-semibold text-sm sm:text-lg tracking-wide hidden sm:inline">Slas Presentation Creator</span>
+        </div>
+        <div class="flex items-center space-x-1.5 sm:space-x-2">
+            <button onclick="saveSlasFile()" class="px-2 sm:px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded text-xs font-medium transition flex items-center space-x-1 shadow-sm">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden sm:inline">.slas 保存</span>
+            </button>
+            <label class="px-2 sm:px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded text-xs font-medium transition flex items-center space-x-1 cursor-pointer shadow-sm">
+                <i class="fa-solid fa-upload"></i>
+                <span class="hidden sm:inline">.slas 読み込み</span>
+                <input type="file" accept=".slas,.json" onchange="loadSlasFile(event)" class="hidden">
+            </label>
+            <button onclick="startPresentation()" class="px-3 sm:px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-amber-950 font-bold rounded text-xs transition flex items-center space-x-1 shadow">
+                <i class="fa-solid fa-play"></i>
+                <span>再生</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- RIBBON TOOLBAR MENU -->
+    <div class="bg-slate-200 border-b border-slate-300 shrink-0 select-none">
+        <!-- Tabs Nav -->
+        <div class="flex bg-slate-300/80 px-1 sm:px-2 text-xs text-slate-700 border-b border-slate-300 overflow-x-auto whitespace-nowrap">
+            <button onclick="switchTab('home')" id="tab-home" class="ribbon-tab active px-3 sm:px-4 py-2 shrink-0">ホーム</button>
+            <button onclick="switchTab('insert')" id="tab-insert" class="ribbon-tab px-3 sm:px-4 py-2 shrink-0">挿入</button>
+            <button onclick="switchTab('draw')" id="tab-draw" class="ribbon-tab px-3 sm:px-4 py-2 shrink-0">描画</button>
+            <button onclick="switchTab('animation')" id="tab-animation" class="ribbon-tab px-3 sm:px-4 py-2 shrink-0">アニメーション</button>
+        </div>
+
+        <!-- Ribbon Toolbar Content -->
+        <div class="p-1.5 sm:p-2 bg-white min-h-[58px] sm:min-h-[64px] flex items-center shadow-inner text-xs overflow-x-auto whitespace-nowrap">
+            
+            <!-- HOME TAB -->
+            <div id="panel-home" class="ribbon-panel flex items-center space-x-2 sm:space-x-3">
+                <div class="flex flex-col items-center shrink-0">
+                    <button onclick="addNewSlide()" class="px-2.5 sm:px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded flex items-center space-x-1 shadow-sm">
+                        <i class="fa-solid fa-plus text-xs sm:text-sm"></i>
+                        <span class="font-semibold text-xs">新規スライド</span>
+                    </button>
+                </div>
+                <div class="h-7 sm:h-8 w-[1px] bg-slate-300 shrink-0"></div>
+                <button onclick="addTextBox()" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-font text-sm sm:text-base text-amber-600"></i>
+                    <span class="text-[10px] sm:text-xs">テキスト</span>
+                </button>
+                <div class="h-7 sm:h-8 w-[1px] bg-slate-300 shrink-0"></div>
+                <!-- Text Formatting Quick Controls -->
+                <div class="flex items-center space-x-1 bg-slate-50 p-1 border rounded shrink-0">
+                    <button onclick="toggleTextFormat('isBold')" title="太字" class="w-7 h-7 hover:bg-slate-200 rounded font-bold text-slate-700 flex items-center justify-center border text-xs bg-white">B</button>
+                    <button onclick="toggleTextFormat('isItalic')" title="斜体" class="w-7 h-7 hover:bg-slate-200 rounded italic text-slate-700 flex items-center justify-center border text-xs font-serif bg-white">I</button>
+                    <button onclick="toggleTextFormat('isUnderline')" title="下線" class="w-7 h-7 hover:bg-slate-200 rounded underline text-slate-700 flex items-center justify-center border text-xs bg-white">U</button>
+                    <button onclick="toggleTextFormat('isStrikethrough')" title="打消し線" class="w-7 h-7 hover:bg-slate-200 rounded line-through text-slate-700 flex items-center justify-center border text-xs bg-white">S</button>
+                </div>
+                <div class="h-7 sm:h-8 w-[1px] bg-slate-300 shrink-0"></div>
+                <button onclick="deleteSelectedObject()" class="p-1.5 sm:p-2 hover:bg-red-50 text-red-600 rounded flex flex-col items-center shrink-0">
+                    <i class="fa-solid fa-trash-can text-sm sm:text-base"></i>
+                    <span class="text-[10px] sm:text-xs">削除</span>
+                </button>
+            </div>
+
+            <!-- INSERT TAB -->
+            <div id="panel-insert" class="ribbon-panel hidden flex items-center space-x-2 sm:space-x-3">
+                <button onclick="openMediaModal('image')" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-image text-sm sm:text-base text-emerald-600"></i>
+                    <span class="text-[10px] sm:text-xs">画像</span>
+                </button>
+                <button onclick="openMediaModal('video')" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-file-video text-sm sm:text-base text-purple-600"></i>
+                    <span class="text-[10px] sm:text-xs">動画</span>
+                </button>
+                <button onclick="openMediaModal('youtube')" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-brands fa-youtube text-sm sm:text-base text-red-600"></i>
+                    <span class="text-[10px] sm:text-xs">YouTube</span>
+                </button>
+                <div class="h-7 sm:h-8 w-[1px] bg-slate-300 shrink-0"></div>
+                <!-- Charts -->
+                <button onclick="addChart('line')" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-chart-line text-sm sm:text-base text-blue-500"></i>
+                    <span class="text-[10px] sm:text-xs">折れ線</span>
+                </button>
+                <button onclick="addChart('bar')" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-chart-column text-sm sm:text-base text-indigo-500"></i>
+                    <span class="text-[10px] sm:text-xs">棒グラフ</span>
+                </button>
+                <button onclick="addChart('pie')" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-chart-pie text-sm sm:text-base text-amber-500"></i>
+                    <span class="text-[10px] sm:text-xs">円グラフ</span>
+                </button>
+                <div class="h-7 sm:h-8 w-[1px] bg-slate-300 shrink-0"></div>
+                <!-- Code Block -->
+                <button onclick="addCodeBlock()" class="p-1.5 sm:p-2 hover:bg-slate-100 rounded flex flex-col items-center text-slate-700 shrink-0">
+                    <i class="fa-solid fa-code text-sm sm:text-base text-slate-800"></i>
+                    <span class="text-[10px] sm:text-xs">コード</span>
+                </button>
+            </div>
+
+            <!-- DRAW TAB -->
+            <div id="panel-draw" class="ribbon-panel hidden flex items-center space-x-2 sm:space-x-3">
+                <button id="penToggleBtn" onclick="togglePenMode()" class="px-2.5 sm:px-3 py-1.5 border border-slate-300 rounded flex items-center space-x-1.5 text-slate-700 bg-slate-50 shrink-0">
+                    <i class="fa-solid fa-pen-nib text-amber-600"></i>
+                    <span id="penStatusText" class="text-xs">ペン: OFF</span>
+                </button>
+                <div class="flex items-center space-x-1 shrink-0">
+                    <span>色:</span>
+                    <input type="color" id="penColor" value="#ef4444" class="w-6 h-6 sm:w-7 sm:h-7 cursor-pointer border rounded">
+                </div>
+                <div class="flex items-center space-x-1 shrink-0">
+                    <span>太さ:</span>
+                    <input type="range" id="penWidth" min="1" max="20" value="4" class="w-16 sm:w-20">
+                </div>
+                <button onclick="clearCurrentSlideDrawing()" class="px-2.5 sm:px-3 py-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 text-slate-700 rounded border text-xs shrink-0">
+                    手描き消去
+                </button>
+            </div>
+
+            <!-- ANIMATION TAB -->
+            <div id="panel-animation" class="ribbon-panel hidden flex items-center space-x-2 sm:space-x-3">
+                <span class="text-slate-500 shrink-0">効果:</span>
+                <button onclick="setObjectAnimation('none')" class="px-2 py-1 border rounded hover:bg-slate-100 text-xs shrink-0">なし</button>
+                <button onclick="setObjectAnimation('fade')" class="px-2 py-1 border rounded hover:bg-slate-100 text-xs shrink-0">フェード</button>
+                <button onclick="setObjectAnimation('slide')" class="px-2 py-1 border rounded hover:bg-slate-100 text-xs shrink-0">スライド</button>
+                <button onclick="setObjectAnimation('zoom')" class="px-2 py-1 border rounded hover:bg-slate-100 text-xs shrink-0">ズーム</button>
+                <button onclick="setObjectAnimation('bounce')" class="px-2 py-1 border rounded hover:bg-slate-100 text-xs shrink-0">バウンス</button>
+                <div class="h-7 sm:h-8 w-[1px] bg-slate-300 shrink-0"></div>
+                <button onclick="playObjectAnimationPreview()" class="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded flex items-center space-x-1 text-xs shrink-0">
+                    <i class="fa-solid fa-play text-xs"></i>
+                    <span>再生</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MOBILE VIEW SWITCHER BAR (Visible on mobile/portrait screens) -->
+    <div class="lg:hidden bg-slate-300 border-b border-slate-300 flex justify-around p-1 text-xs font-medium shrink-0">
+        <button onclick="switchMobileView('slides')" id="mobile-tab-slides" class="mobile-view-btn active px-3 py-1.5 rounded flex items-center space-x-1">
+            <i class="fa-solid fa-layer-group"></i>
+            <span>一覧</span>
+        </button>
+        <button onclick="switchMobileView('canvas')" id="mobile-tab-canvas" class="mobile-view-btn px-3 py-1.5 rounded flex items-center space-x-1">
+            <i class="fa-solid fa-display"></i>
+            <span>キャンバス</span>
+        </button>
+        <button onclick="switchMobileView('property')" id="mobile-tab-property" class="mobile-view-btn px-3 py-1.5 rounded flex items-center space-x-1">
+            <i class="fa-solid fa-sliders"></i>
+            <span>設定</span>
+        </button>
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+        
+        <!-- SLIDE THUMBNAILS LIST (LEFT SIDEBAR / MOBILE TAB) -->
+        <div id="sidebarThumbnails" class="w-full lg:w-56 bg-slate-200 border-b lg:border-b-0 lg:border-r border-slate-300 flex flex-col shrink-0 h-40 lg:h-full overflow-hidden">
+            <div class="p-2 border-b border-slate-300 font-semibold text-slate-600 text-xs flex justify-between items-center shrink-0">
+                <span>スライド一覧</span>
+                <button onclick="addNewSlide()" class="text-amber-700 hover:text-amber-900 font-bold px-1">+ 追加</button>
+            </div>
+            <div id="thumbnailsList" class="flex-1 overflow-x-auto lg:overflow-x-hidden lg:overflow-y-auto p-2 lg:p-3 flex lg:flex-col space-x-2 lg:space-x-0 lg:space-y-3">
+                <!-- Thumbnails dynamically rendered here -->
+            </div>
+        </div>
+
+        <!-- CANVAS WORK AREA (CENTER) -->
+        <div id="sectionCanvas" class="flex-1 bg-slate-300 flex flex-col items-center justify-center p-2 sm:p-4 overflow-auto relative min-h-0">
+            
+            <!-- SLIDE CANVAS CONTAINER (16:9 Aspect Ratio) -->
+            <div id="slideCanvasContainer" class="w-full max-w-4xl slide-aspect bg-white rounded shadow-xl relative overflow-hidden select-none border border-slate-300">
+                
+                <!-- Drawing Overlay Canvas -->
+                <canvas id="penCanvas" class="absolute inset-0 w-full h-full z-10 pointer-events-none"></canvas>
+
+                <!-- Objects Container -->
+                <div id="slideObjects" class="absolute inset-0">
+                    <!-- Dynamic Objects Rendered Here -->
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- PROPERTY INSPECTOR (RIGHT SIDEBAR / MOBILE TAB) -->
+        <div id="sidebarProperty" class="w-full lg:w-64 bg-white border-t lg:border-t-0 lg:border-l border-slate-300 p-3 sm:p-4 flex flex-col shrink-0 h-48 lg:h-full overflow-y-auto text-xs hidden lg:flex">
+            <h3 class="font-bold text-slate-700 border-b pb-2 mb-3 flex items-center space-x-1">
+                <i class="fa-solid fa-sliders text-amber-600"></i>
+                <span>プロパティ設定</span>
+            </h3>
+            
+            <div id="propertyPanel" class="space-y-4">
+                <p class="text-slate-400 italic">オブジェクトを選択すると設定が表示されます。</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MEDIA INSERTION MODAL -->
+    <div id="mediaModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 hidden">
+        <div class="bg-white w-full max-w-md rounded-lg shadow-2xl p-4 sm:p-5 border border-slate-200 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 id="mediaModalTitle" class="font-bold text-slate-800 text-sm flex items-center space-x-2">
+                    <i class="fa-solid fa-link text-amber-600"></i>
+                    <span>メディアの追加</span>
+                </h3>
+                <button onclick="closeMediaModal()" class="text-slate-400 hover:text-slate-600 text-lg px-2">&times;</button>
+            </div>
+
+            <!-- Tab 1: Direct URL -->
+            <div id="modalUrlSection" class="space-y-3">
+                <div>
+                    <label class="block mb-1 text-xs font-semibold text-slate-600">Web URLを入力:</label>
+                    <input type="text" id="mediaUrlInput" placeholder="https://..." class="w-full border p-2 rounded text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                </div>
+                <!-- Preset Sample Buttons for testing -->
+                <div>
+                    <label class="block mb-1 text-xs font-semibold text-slate-500">サンプル試用リンク:</label>
+                    <div id="samplePresetContainer" class="flex flex-wrap gap-1.5"></div>
+                </div>
+            </div>
+
+            <div class="my-3 text-center text-slate-400 font-semibold text-xs border-t pt-3">または</div>
+
+            <!-- Tab 2: File Upload -->
+            <div>
+                <label class="block mb-1 text-xs font-semibold text-slate-600">パソコン・スマホからファイルをアップロード:</label>
+                <input type="file" id="mediaFileInput" class="w-full border p-1 rounded text-xs bg-slate-50">
+            </div>
+
+            <div class="mt-5 flex justify-end space-x-2">
+                <button onclick="closeMediaModal()" class="px-3 py-1.5 border rounded hover:bg-slate-100 text-xs">キャンセル</button>
+                <button onclick="submitMediaModal()" class="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded font-bold text-xs shadow">追加する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FULLSCREEN PRESENTATION OVERLAY -->
+    <div id="presentationOverlay" class="fixed inset-0 bg-black z-50 hidden flex items-center justify-center p-2 sm:p-4">
+        <div id="presentationSlide" class="w-full max-w-6xl slide-aspect bg-white relative overflow-hidden shadow-2xl">
+            <!-- Fullscreen presentation elements rendered here -->
+        </div>
+        <!-- Exit Controls Hint -->
+        <div class="absolute top-3 right-3 bg-black/60 text-white px-3 py-1.5 rounded-full text-xs pointer-events-none opacity-80 flex items-center space-x-2">
+            <span>[Esc] 終了 | [←][→] 移動</span>
+        </div>
+    </div>
+
+    <script>
+        // APP STATE
+        let presentationData = {
+            slides: [
+                {
+                    id: 'slide_1',
+                    bgColor: '#ffffff',
+                    objects: [
+                        {
+                            id: 'obj_1',
+                            type: 'text',
+                            x: 10, y: 15, width: 80, height: 25,
+                            content: 'Slas Slides へようこそ！',
+                            fontSize: 28,
+                            textColor: '#1e293b',
+                            bgColor: 'transparent',
+                            borderColor: 'transparent',
+                            borderWidth: 0,
+                            borderRadius: 0,
+                            isBold: true,
+                            isItalic: false,
+                            isUnderline: false,
+                            isStrikethrough: false,
+                            animation: 'fade'
+                        },
+                        {
+                            id: 'obj_2',
+                            type: 'text',
+                            x: 10, y: 45, width: 80, height: 35,
+                            content: 'PowerPoint風の直感的なUIで、スマホ・PC両方で快適に操作可能！文字装飾、画像・動画・YouTube・グラフ・手書きペン機能が使えます。',
+                            fontSize: 16,
+                            textColor: '#475569',
+                            bgColor: 'transparent',
+                            borderColor: 'transparent',
+                            borderWidth: 0,
+                            borderRadius: 0,
+                            isBold: false,
+                            isItalic: false,
+                            isUnderline: false,
+                            isStrikethrough: false,
+                            animation: 'slide'
+                        }
+                    ],
+                    penDrawingData: null
+                }
+            ]
+        };
+
+        let currentSlideIndex = 0;
+        let selectedObjectId = null;
+        let slideIdCounter = 2;
+        let activeMediaType = null; // 'image', 'video', 'youtube'
+
+        // Pen Drawing State
+        let isPenMode = false;
+        let isDrawing = false;
+        let penCtx = null;
+
+        // Mouse & Touch Drag / Resize State
+        let isDragging = false;
+        let isResizing = false;
+        let resizeDirection = '';
+        let dragStartX = 0, dragStartY = 0;
+        let initialObjPos = { x: 0, y: 0, w: 0, h: 0 };
+
+        // Mobile active view tab state ('canvas', 'slides', 'property')
+        let currentMobileView = 'canvas';
+
+        window.onload = function() {
+            initPenCanvas();
+            renderThumbnails();
+            renderSlideCanvas();
+
+            // Handle window resize for mobile responsive view adjustments
+            window.addEventListener('resize', () => {
+                applyResponsiveLayout();
+            });
+            applyResponsiveLayout();
+
+            // Keyboard Navigation Shortcuts
+            window.addEventListener('keydown', (e) => {
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable) {
+                    return;
+                }
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    deleteSelectedObject();
+                } else if (e.key === 'F5') {
+                    e.preventDefault();
+                    startPresentation();
+                } else if (e.key === 'Escape') {
+                    endPresentation();
+                } else if (e.key === 'ArrowRight' || e.key === 'Space') {
+                    if (!document.getElementById('presentationOverlay').classList.contains('hidden')) {
+                        nextSlide();
+                    }
+                } else if (e.key === 'ArrowLeft') {
+                    if (!document.getElementById('presentationOverlay').classList.contains('hidden')) {
+                        prevSlide();
+                    }
+                }
+            });
+        };
+
+        function applyResponsiveLayout() {
+            const isMobile = window.innerWidth < 1024; // lg breakpoint
+            const sidebarThumbnails = document.getElementById('sidebarThumbnails');
+            const sectionCanvas = document.getElementById('sectionCanvas');
+            const sidebarProperty = document.getElementById('sidebarProperty');
+
+            if (!isMobile) {
+                // Desktop: Show all 3 columns
+                sidebarThumbnails.classList.remove('hidden');
+                sectionCanvas.classList.remove('hidden');
+                sidebarProperty.classList.remove('hidden');
+            } else {
+                // Mobile: Show active view tab only
+                sidebarThumbnails.classList.toggle('hidden', currentMobileView !== 'slides');
+                sectionCanvas.classList.toggle('hidden', currentMobileView !== 'canvas');
+                sidebarProperty.classList.toggle('hidden', currentMobileView !== 'property');
+            }
+        }
+
+        function switchMobileView(viewName) {
+            currentMobileView = viewName;
+            document.querySelectorAll('.mobile-view-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`mobile-tab-${viewName}`).classList.add('active');
+            applyResponsiveLayout();
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.ribbon-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.ribbon-panel').forEach(p => p.classList.add('hidden'));
+
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            document.getElementById(`panel-${tabName}`).classList.remove('hidden');
+        }
+
+        function addNewSlide() {
+            slideIdCounter++;
+            const newSlide = {
+                id: `slide_${slideIdCounter}`,
+                bgColor: '#ffffff',
+                objects: [
+                    {
+                        id: `obj_${Date.now()}`,
+                        type: 'text',
+                        x: 10, y: 10, width: 80, height: 20,
+                        content: 'タイトルを入力',
+                        fontSize: 26,
+                        textColor: '#0f172a',
+                        bgColor: 'transparent',
+                        borderColor: 'transparent',
+                        borderWidth: 0,
+                        borderRadius: 0,
+                        isBold: true,
+                        isItalic: false,
+                        isUnderline: false,
+                        isStrikethrough: false,
+                        animation: 'none'
+                    }
+                ],
+                penDrawingData: null
+            };
+            presentationData.slides.push(newSlide);
+            currentSlideIndex = presentationData.slides.length - 1;
+            selectedObjectId = null;
+            renderThumbnails();
+            renderSlideCanvas();
+
+            if (window.innerWidth < 1024) {
+                switchMobileView('canvas');
+            }
+        }
+
+        function deleteSlide(index, event) {
+            if (event) event.stopPropagation();
+            if (presentationData.slides.length <= 1) {
+                alert("スライドは最低1枚必要です。");
+                return;
+            }
+            presentationData.slides.splice(index, 1);
+            if (currentSlideIndex >= presentationData.slides.length) {
+                currentSlideIndex = presentationData.slides.length - 1;
+            }
+            selectedObjectId = null;
+            renderThumbnails();
+            renderSlideCanvas();
+        }
+
+        function selectSlide(index) {
+            saveCurrentSlideDrawing();
+            currentSlideIndex = index;
+            selectedObjectId = null;
+            renderThumbnails();
+            renderSlideCanvas();
+
+            if (window.innerWidth < 1024) {
+                switchMobileView('canvas');
+            }
+        }
+
+        function renderThumbnails() {
+            const list = document.getElementById('thumbnailsList');
+            list.innerHTML = '';
+
+            presentationData.slides.forEach((slide, idx) => {
+                const isActive = idx === currentSlideIndex;
+                const thumb = document.createElement('div');
+                thumb.className = `p-1.5 rounded cursor-pointer transition border-2 flex flex-col space-y-1 shrink-0 w-36 lg:w-full ${
+                    isActive ? 'border-amber-500 bg-amber-50/50 shadow-md' : 'border-slate-300 hover:border-amber-300 bg-white'
+                }`;
+                thumb.onclick = () => selectSlide(idx);
+
+                // Thumbnail Canvas Header
+                const head = document.createElement('div');
+                head.className = "flex justify-between items-center text-[10px] text-slate-500 px-0.5";
+                head.innerHTML = `<span>スライド ${idx + 1}</span><button onclick="deleteSlide(${idx}, event)" class="hover:text-red-500 p-0.5"><i class="fa-solid fa-xmark"></i></button>`;
+
+                // Mini Preview Box
+                const miniBox = document.createElement('div');
+                miniBox.className = "w-full slide-aspect rounded border border-slate-200 bg-white relative overflow-hidden shadow-inner";
+                miniBox.style.backgroundColor = slide.bgColor || '#ffffff';
+
+                // Render simplified objects in mini preview
+                let miniPreviewHtml = '';
+                slide.objects.forEach(obj => {
+                    const posStyle = `position: absolute; left: ${obj.x}%; top: ${obj.y}%; width: ${obj.width}%; height: ${obj.height}%; opacity: 0.85; overflow: hidden; pointer-events: none;`;
+                    if (obj.type === 'text') {
+                        let decs = [];
+                        if (obj.isUnderline) decs.push('underline');
+                        if (obj.isStrikethrough) decs.push('line-through');
+                        const textDec = decs.length > 0 ? decs.join(' ') : 'none';
+                        const fontWeight = obj.isBold ? 'bold' : 'normal';
+                        const fontStyle = obj.isItalic ? 'italic' : 'normal';
+                        miniPreviewHtml += `<div style="${posStyle} font-size: 5px; line-height: 1.1; color: ${obj.textColor}; background-color: ${obj.bgColor || 'transparent'}; border: ${obj.borderWidth || 0}px solid ${obj.borderColor || 'transparent'}; border-radius: ${obj.borderRadius || 0}px; padding: 1px; text-decoration: ${textDec}; font-weight: ${fontWeight}; font-style: ${fontStyle};">${escapeHtml(obj.content)}</div>`;
+                    } else if (obj.type === 'image') {
+                        miniPreviewHtml += `<img src="${obj.src}" style="${posStyle} object-fit: cover;">`;
+                    } else if (obj.type === 'video' || obj.type === 'youtube') {
+                        miniPreviewHtml += `<div style="${posStyle} background: #1e293b; color: white; display: flex; items-center; justify-content: center; font-size: 8px;"><i class="fa-solid fa-circle-play"></i></div>`;
+                    } else if (obj.type === 'chart') {
+                        miniPreviewHtml += `<div style="${posStyle} background: #f8fafc; border: 1px solid #cbd5e1; display: flex; items-center; justify-content: center; font-size: 8px; color: #64748b;"><i class="fa-solid fa-chart-simple"></i></div>`;
+                    } else if (obj.type === 'code') {
+                        miniPreviewHtml += `<div style="${posStyle} background: #0f172a; color: #38bdf8; font-size: 4px; padding: 1px;">&lt;/&gt; Code</div>`;
+                    }
+                });
+
+                // Mini Pen Drawing
+                if (slide.penDrawingData) {
+                    miniPreviewHtml += `<img src="${slide.penDrawingData}" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none;">`;
+                }
+
+                miniBox.innerHTML = miniPreviewHtml;
+                thumb.appendChild(head);
+                thumb.appendChild(miniBox);
+                list.appendChild(thumb);
+            });
+        }
+
+        function renderSlideCanvas(isPresenting = false) {
+            const slide = presentationData.slides[currentSlideIndex];
+            const container = isPresenting ? document.getElementById('presentationSlide') : document.getElementById('slideObjects');
+            container.innerHTML = '';
+            container.style.backgroundColor = slide.bgColor || '#ffffff';
+
+            slide.objects.forEach(obj => {
+                const el = document.createElement('div');
+                el.id = `canvas_obj_${obj.id}`;
+                el.style.position = 'absolute';
+                el.style.left = obj.x + '%';
+                el.style.top = obj.y + '%';
+                el.style.width = obj.width + '%';
+                el.style.height = obj.height + '%';
+
+                // Add Animation class if present
+                if (obj.animation && obj.animation !== 'none') {
+                    el.classList.add(`anim-${obj.animation}`);
+                }
+
+                // Selection Border for edit mode
+                const isSelected = (!isPresenting && obj.id === selectedObjectId);
+                if (isSelected) {
+                    el.style.outline = '2px dashed #f59e0b';
+                }
+
+                // Object Drag listener for both mouse and touch
+                if (!isPresenting) {
+                    el.onmousedown = (e) => startObjectDrag(e, obj.id);
+                    el.ontouchstart = (e) => startObjectDrag(e, obj.id);
+                }
+
+                // Element Types Rendering
+                if (obj.type === 'text') {
+                    el.style.backgroundColor = obj.bgColor || 'transparent';
+                    el.style.borderColor = obj.borderColor || 'transparent';
+                    el.style.borderWidth = (obj.borderWidth || 0) + 'px';
+                    el.style.borderStyle = obj.borderWidth ? 'solid' : 'none';
+                    el.style.borderRadius = (obj.borderRadius || 0) + 'px';
+
+                    const innerText = document.createElement('div');
+                    innerText.contentEditable = !isPresenting;
+                    innerText.className = "w-full h-full p-1.5 sm:p-2 outline-none overflow-auto cursor-text";
+                    innerText.style.fontSize = obj.fontSize + 'px';
+                    innerText.style.color = obj.textColor;
+                    innerText.style.fontWeight = obj.isBold ? 'bold' : 'normal';
+                    innerText.style.fontStyle = obj.isItalic ? 'italic' : 'normal';
+
+                    let decs = [];
+                    if (obj.isUnderline) decs.push('underline');
+                    if (obj.isStrikethrough) decs.push('line-through');
+                    innerText.style.textDecoration = decs.length > 0 ? decs.join(' ') : 'none';
+
+                    innerText.innerText = obj.content;
+
+                    const handleTextSelect = (e) => {
+                        e.stopPropagation();
+                        selectedObjectId = obj.id;
+                        renderPropertyPanel();
+                    };
+
+                    innerText.onmousedown = handleTextSelect;
+                    innerText.ontouchstart = handleTextSelect;
+
+                    innerText.oninput = (e) => {
+                        obj.content = e.target.innerText;
+                        renderThumbnails();
+                        const area = document.getElementById('objContentInput');
+                        if (area) area.value = obj.content;
+                    };
+
+                    el.appendChild(innerText);
+
+                } else if (obj.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = obj.src;
+                    img.className = "w-full h-full object-contain pointer-events-none";
+                    el.appendChild(img);
+
+                } else if (obj.type === 'video') {
+                    const video = document.createElement('video');
+                    video.src = obj.src;
+                    video.controls = isPresenting;
+                    video.className = "w-full h-full object-contain";
+                    el.appendChild(video);
+
+                    if (!isPresenting) {
+                        const overlay = document.createElement('div');
+                        overlay.className = "absolute inset-0 bg-transparent z-10 cursor-move";
+                        el.appendChild(overlay);
+                    }
+
+                } else if (obj.type === 'youtube') {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = `https://www.youtube.com/embed/${obj.videoId}?autoplay=0`;
+                    iframe.className = "w-full h-full border-0";
+                    iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+                    el.appendChild(iframe);
+
+                    if (!isPresenting) {
+                        const overlay = document.createElement('div');
+                        overlay.className = "absolute inset-0 bg-transparent z-10 cursor-move";
+                        el.appendChild(overlay);
+                    }
+
+                } else if (obj.type === 'chart') {
+                    const canvas = document.createElement('canvas');
+                    canvas.id = `chart_canvas_${obj.id}`;
+                    canvas.className = "w-full h-full";
+                    el.appendChild(canvas);
+
+                    setTimeout(() => {
+                        renderChartOnCanvas(canvas.id, obj);
+                    }, 50);
+
+                } else if (obj.type === 'code') {
+                    const pre = document.createElement('pre');
+                    pre.className = "w-full h-full bg-slate-900 text-sky-400 p-2 sm:p-3 rounded font-mono text-[10px] sm:text-xs overflow-auto";
+                    pre.innerText = obj.content;
+                    el.appendChild(pre);
+                }
+
+                // Add 8 direction Resize handles if selected
+                if (isSelected) {
+                    addResizeHandles(el, obj);
+                }
+
+                container.appendChild(el);
+            });
+
+            // Load drawing overlay
+            loadCurrentSlideDrawing();
+            renderPropertyPanel();
+        }
+
+        function renderChartOnCanvas(canvasId, obj) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            const existingChart = Chart.getChart(ctx);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+
+            let labels = ['A', 'B', 'C', 'D'];
+            let data = [12, 19, 3, 5];
+
+            if (obj.dataStr) {
+                const lines = obj.dataStr.trim().split('\n');
+                labels = [];
+                data = [];
+                lines.forEach(l => {
+                    const parts = l.split(',');
+                    if (parts.length >= 2) {
+                        labels.push(parts[0].trim());
+                        data.push(parseFloat(parts[1]) || 0);
+                    }
+                });
+            }
+
+            new Chart(ctx, {
+                type: obj.chartType || 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'データ',
+                        data: data,
+                        backgroundColor: obj.chartType === 'pie' ? ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6'] : 'rgba(245, 158, 11, 0.6)',
+                        borderColor: '#f59e0b',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: obj.chartType === 'pie' } }
+                }
+            });
+        }
+
+        function getEventCoords(e) {
+            if (e.touches && e.touches.length > 0) {
+                return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
+            }
+            return { clientX: e.clientX, clientY: e.clientY };
+        }
+
+        function startObjectDrag(e, id) {
+            if (isPenMode) return;
+            e.stopPropagation();
+            selectedObjectId = id;
+            isDragging = true;
+            
+            const coords = getEventCoords(e);
+            dragStartX = coords.clientX;
+            dragStartY = coords.clientY;
+
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === id);
+            if (obj) {
+                initialObjPos = { ...obj };
+            }
+
+            renderSlideCanvas();
+
+            document.addEventListener('mousemove', handleObjectMove);
+            document.addEventListener('mouseup', handleObjectEnd);
+            document.addEventListener('touchmove', handleObjectMove, { passive: false });
+            document.addEventListener('touchend', handleObjectEnd);
+        }
+
+        function addResizeHandles(el, obj) {
+            const positions = ['tl', 'tr', 'bl', 'br', 'tc', 'bc', 'lc', 'rc'];
+            positions.forEach(pos => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle pos-${pos}`;
+                if (pos === 'tl') { handle.style.top = '-7px'; handle.style.left = '-7px'; handle.style.cursor = 'nwse-resize'; }
+                if (pos === 'tr') { handle.style.top = '-7px'; handle.style.right = '-7px'; handle.style.cursor = 'nesw-resize'; }
+                if (pos === 'bl') { handle.style.bottom = '-7px'; handle.style.left = '-7px'; handle.style.cursor = 'nesw-resize'; }
+                if (pos === 'br') { handle.style.bottom = '-7px'; handle.style.right = '-7px'; handle.style.cursor = 'nwse-resize'; }
+                if (pos === 'tc') { handle.style.top = '-7px'; handle.style.left = 'calc(50% - 7px)'; handle.style.cursor = 'ns-resize'; }
+                if (pos === 'bc') { handle.style.bottom = '-7px'; handle.style.left = 'calc(50% - 7px)'; handle.style.cursor = 'ns-resize'; }
+                if (pos === 'lc') { handle.style.left = '-7px'; handle.style.top = 'calc(50% - 7px)'; handle.style.cursor = 'ew-resize'; }
+                if (pos === 'rc') { handle.style.right = '-7px'; handle.style.top = 'calc(50% - 7px)'; handle.style.cursor = 'ew-resize'; }
+
+                const startResize = (e) => {
+                    e.stopPropagation();
+                    isResizing = true;
+                    resizeDirection = pos;
+                    const coords = getEventCoords(e);
+                    dragStartX = coords.clientX;
+                    dragStartY = coords.clientY;
+                    initialObjPos = { ...obj };
+                    document.addEventListener('mousemove', handleObjectMove);
+                    document.addEventListener('mouseup', handleObjectEnd);
+                    document.addEventListener('touchmove', handleObjectMove, { passive: false });
+                    document.addEventListener('touchend', handleObjectEnd);
+                };
+
+                handle.onmousedown = startResize;
+                handle.ontouchstart = startResize;
+
+                el.appendChild(handle);
+            });
+        }
+
+        function handleObjectMove(e) {
+            if (!selectedObjectId) return;
+            if (e.cancelable) e.preventDefault();
+
+            const container = document.getElementById('slideCanvasContainer');
+            const rect = container.getBoundingClientRect();
+            const coords = getEventCoords(e);
+
+            const dxPct = ((coords.clientX - dragStartX) / rect.width) * 100;
+            const dyPct = ((coords.clientY - dragStartY) / rect.height) * 100;
+
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === selectedObjectId);
+            if (!obj) return;
+
+            if (isDragging) {
+                obj.x = Math.max(0, Math.min(90, initialObjPos.x + dxPct));
+                obj.y = Math.max(0, Math.min(90, initialObjPos.y + dyPct));
+            } else if (isResizing) {
+                if (resizeDirection.includes('r')) obj.width = Math.max(5, initialObjPos.width + dxPct);
+                if (resizeDirection.includes('b')) obj.height = Math.max(5, initialObjPos.height + dyPct);
+                if (resizeDirection.includes('l')) {
+                    const newW = Math.max(5, initialObjPos.width - dxPct);
+                    obj.x = initialObjPos.x + (initialObjPos.width - newW);
+                    obj.width = newW;
+                }
+                if (resizeDirection.includes('t')) {
+                    const newH = Math.max(5, initialObjPos.height - dyPct);
+                    obj.y = initialObjPos.y + (initialObjPos.height - newH);
+                    obj.height = newH;
+                }
+            }
+
+            // Direct update DOM style
+            const targetEl = document.getElementById(`canvas_obj_${obj.id}`);
+            if (targetEl) {
+                targetEl.style.left = obj.x + '%';
+                targetEl.style.top = obj.y + '%';
+                targetEl.style.width = obj.width + '%';
+                targetEl.style.height = obj.height + '%';
+            }
+        }
+
+        function handleObjectEnd() {
+            isDragging = false;
+            isResizing = false;
+            document.removeEventListener('mousemove', handleObjectMove);
+            document.removeEventListener('mouseup', handleObjectEnd);
+            document.removeEventListener('touchmove', handleObjectMove);
+            document.removeEventListener('touchend', handleObjectEnd);
+            renderThumbnails();
+            renderPropertyPanel();
+        }
+
+        function renderPropertyPanel() {
+            const panel = document.getElementById('propertyPanel');
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === selectedObjectId);
+
+            if (!obj) {
+                panel.innerHTML = `
+                    <div class="space-y-3">
+                        <p class="text-slate-400 italic">オブジェクトを選択していません。</p>
+                        <div>
+                            <label class="block mb-1 font-semibold text-slate-600">スライド背景色:</label>
+                            <input type="color" value="${slide.bgColor || '#ffffff'}" onchange="updateSlideBg(this.value)" class="w-full h-8 border rounded cursor-pointer">
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="space-y-3">
+                    <div class="text-xs font-semibold text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">
+                        種類: ${obj.type.toUpperCase()}
+                    </div>
+
+                    <!-- Position & Size -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block mb-1 font-medium">位置 X (%):</label>
+                            <input type="number" value="${Math.round(obj.x)}" onchange="updateObjProp('x', parseFloat(this.value))" class="w-full border p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1 font-medium">位置 Y (%):</label>
+                            <input type="number" value="${Math.round(obj.y)}" onchange="updateObjProp('y', parseFloat(this.value))" class="w-full border p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1 font-medium">幅 (%):</label>
+                            <input type="number" value="${Math.round(obj.width)}" onchange="updateObjProp('width', parseFloat(this.value))" class="w-full border p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1 font-medium">高さ (%):</label>
+                            <input type="number" value="${Math.round(obj.height)}" onchange="updateObjProp('height', parseFloat(this.value))" class="w-full border p-1 rounded">
+                        </div>
+                    </div>
+            `;
+
+            if (obj.type === 'text') {
+                html += `
+                    <div>
+                        <label class="block mb-1 font-semibold">テキスト内容:</label>
+                        <textarea id="objContentInput" oninput="updateTextContent(this.value)" class="w-full border p-1.5 rounded h-20 text-xs text-slate-800">${obj.content}</textarea>
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">文字の装飾:</label>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <button onclick="toggleTextFormat('isBold')" class="py-1 px-2 border rounded text-xs font-bold ${obj.isBold ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-50 hover:bg-slate-100 text-slate-700'}">太字 (B)</button>
+                            <button onclick="toggleTextFormat('isItalic')" class="py-1 px-2 border rounded text-xs italic font-serif ${obj.isItalic ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-50 hover:bg-slate-100 text-slate-700'}">斜体 (I)</button>
+                            <button onclick="toggleTextFormat('isUnderline')" class="py-1 px-2 border rounded text-xs underline ${obj.isUnderline ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-50 hover:bg-slate-100 text-slate-700'}">下線 (U)</button>
+                            <button onclick="toggleTextFormat('isStrikethrough')" class="py-1 px-2 border rounded text-xs line-through ${obj.isStrikethrough ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-50 hover:bg-slate-100 text-slate-700'}">打消し線 (S)</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">文字サイズ (px):</label>
+                        <input type="number" value="${obj.fontSize}" onchange="updateObjProp('fontSize', parseInt(this.value))" class="w-full border p-1 rounded">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">文字色:</label>
+                        <input type="color" value="${obj.textColor}" onchange="updateObjProp('textColor', this.value)" class="w-full h-8 border rounded cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">背景色:</label>
+                        <input type="color" value="${obj.bgColor || '#ffffff'}" onchange="updateObjProp('bgColor', this.value)" class="w-full h-8 border rounded cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">枠線色:</label>
+                        <input type="color" value="${obj.borderColor || '#000000'}" onchange="updateObjProp('borderColor', this.value)" class="w-full h-8 border rounded cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">枠線の太さ (px):</label>
+                        <input type="number" value="${obj.borderWidth || 0}" min="0" max="20" onchange="updateObjProp('borderWidth', parseInt(this.value))" class="w-full border p-1 rounded">
+                    </div>
+                    <div>
+                        <label class="block mb-1 font-semibold">角丸 (px):</label>
+                        <input type="number" value="${obj.borderRadius || 0}" min="0" max="50" onchange="updateObjProp('borderRadius', parseInt(this.value))" class="w-full border p-1 rounded">
+                    </div>
+                `;
+            } else if (obj.type === 'chart') {
+                html += `
+                    <div>
+                        <label class="block mb-1 font-semibold">データ (項目名,数値):</label>
+                        <textarea onchange="updateChartData(this.value)" class="w-full border p-1.5 rounded h-24 font-mono text-xs">${obj.dataStr || "A, 12\nB, 19\nC, 3\nD, 5"}</textarea>
+                    </div>
+                `;
+            }
+
+            // Animation Settings Section
+            html += `
+                <div class="border-t pt-3 mt-3">
+                    <label class="block mb-1 font-semibold text-slate-700">アニメーション設定:</label>
+                    <select onchange="updateObjProp('animation', this.value)" class="w-full border p-1.5 rounded bg-white font-medium">
+                        <option value="none" ${obj.animation === 'none' ? 'selected' : ''}>なし</option>
+                        <option value="fade" ${obj.animation === 'fade' ? 'selected' : ''}>フェードイン</option>
+                        <option value="slide" ${obj.animation === 'slide' ? 'selected' : ''}>スライドイン</option>
+                        <option value="zoom" ${obj.animation === 'zoom' ? 'selected' : ''}>ズームイン</option>
+                        <option value="bounce" ${obj.animation === 'bounce' ? 'selected' : ''}>バウンス</option>
+                    </select>
+                </div>
+                <div class="pt-2">
+                    <button onclick="deleteSelectedObject()" class="w-full py-1.5 bg-red-500 hover:bg-red-600 text-white rounded font-bold shadow-sm">
+                        このオブジェクトを削除
+                    </button>
+                </div>
+            </div>
+            `;
+
+            panel.innerHTML = html;
+        }
+
+        function updateObjProp(prop, value) {
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === selectedObjectId);
+            if (obj) {
+                obj[prop] = value;
+                renderSlideCanvas();
+                renderThumbnails();
+            }
+        }
+
+        function updateTextContent(value) {
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === selectedObjectId);
+            if (obj && obj.type === 'text') {
+                obj.content = value;
+                renderSlideCanvas();
+                renderThumbnails();
+            }
+        }
+
+        function toggleTextFormat(prop) {
+            if (!selectedObjectId) {
+                alert("テキストボックスを選択してください。");
+                return;
+            }
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === selectedObjectId);
+            if (obj && obj.type === 'text') {
+                obj[prop] = !obj[prop];
+                renderSlideCanvas();
+                renderThumbnails();
+            }
+        }
+
+        function updateSlideBg(color) {
+            presentationData.slides[currentSlideIndex].bgColor = color;
+            renderSlideCanvas();
+            renderThumbnails();
+        }
+
+        function deleteSelectedObject() {
+            if (!selectedObjectId) return;
+            const slide = presentationData.slides[currentSlideIndex];
+            slide.objects = slide.objects.filter(o => o.id !== selectedObjectId);
+            selectedObjectId = null;
+            renderSlideCanvas();
+            renderThumbnails();
+        }
+
+        function addTextBox() {
+            const slide = presentationData.slides[currentSlideIndex];
+            const newObj = {
+                id: `obj_${Date.now()}`,
+                type: 'text',
+                x: 25, y: 35, width: 50, height: 20,
+                content: 'ここにテキストを入力',
+                fontSize: 20,
+                textColor: '#1e293b',
+                bgColor: 'transparent',
+                borderColor: 'transparent',
+                borderWidth: 0,
+                borderRadius: 0,
+                isBold: false,
+                isItalic: false,
+                isUnderline: false,
+                isStrikethrough: false,
+                animation: 'none'
+            };
+            slide.objects.push(newObj);
+            selectedObjectId = newObj.id;
+            renderSlideCanvas();
+            renderThumbnails();
+
+            if (window.innerWidth < 1024) {
+                switchMobileView('canvas');
+            }
+        }
+
+        function openMediaModal(type) {
+            activeMediaType = type;
+            const modal = document.getElementById('mediaModal');
+            const title = document.getElementById('mediaModalTitle');
+            const presets = document.getElementById('samplePresetContainer');
+            document.getElementById('mediaUrlInput').value = '';
+            document.getElementById('mediaFileInput').value = '';
+
+            presets.innerHTML = '';
+
+            if (type === 'image') {
+                title.innerHTML = `<i class="fa-solid fa-image text-emerald-600"></i><span>画像の追加</span>`;
+                presets.innerHTML = `
+                    <button onclick="useSampleMedia('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 border rounded text-[10px]">グラデーション</button>
+                    <button onclick="useSampleMedia('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 border rounded text-[10px]">テクノロジー</button>
+                `;
+            } else if (type === 'video') {
+                title.innerHTML = `<i class="fa-solid fa-file-video text-purple-600"></i><span>動画の追加</span>`;
+                presets.innerHTML = `
+                    <button onclick="useSampleMedia('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 border rounded text-[10px]">サンプル動画1</button>
+                `;
+            } else if (type === 'youtube') {
+                title.innerHTML = `<i class="fa-brands fa-youtube text-red-600"></i><span>YouTubeの追加</span>`;
+                presets.innerHTML = `
+                    <button onclick="useSampleMedia('https://www.youtube.com/watch?v=dQw4w9WgXcQ')" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 border rounded text-[10px]">YouTube サンプル</button>
+                `;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeMediaModal() {
+            document.getElementById('mediaModal').classList.add('hidden');
+        }
+
+        function useSampleMedia(url) {
+            document.getElementById('mediaUrlInput').value = url;
+        }
+
+        function submitMediaModal() {
+            const urlInput = document.getElementById('mediaUrlInput').value.trim();
+            const fileInput = document.getElementById('mediaFileInput');
+
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    addMediaObjectToSlide(e.target.result);
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else if (urlInput !== '') {
+                addMediaObjectToSlide(urlInput);
+            } else {
+                alert("URLを入力するかファイルを選択してください。");
+                return;
+            }
+
+            closeMediaModal();
+        }
+
+        function addMediaObjectToSlide(src) {
+            const slide = presentationData.slides[currentSlideIndex];
+            let newObj = null;
+
+            if (activeMediaType === 'image') {
+                newObj = {
+                    id: `obj_${Date.now()}`,
+                    type: 'image',
+                    x: 20, y: 20, width: 40, height: 40,
+                    src: src,
+                    animation: 'none'
+                };
+            } else if (activeMediaType === 'video') {
+                newObj = {
+                    id: `obj_${Date.now()}`,
+                    type: 'video',
+                    x: 20, y: 20, width: 50, height: 40,
+                    src: src,
+                    animation: 'none'
+                };
+            } else if (activeMediaType === 'youtube') {
+                let videoId = '';
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|shorts\/)([^#\&\?]*).*/;
+                const match = src.match(regExp);
+                if (match && match[2].length === 11) {
+                    videoId = match[2];
+                } else {
+                    alert("有効なYouTube URLが認識できませんでした。");
+                    return;
+                }
+                newObj = {
+                    id: `obj_${Date.now()}`,
+                    type: 'youtube',
+                    x: 20, y: 20, width: 50, height: 40,
+                    videoId: videoId,
+                    animation: 'none'
+                };
+            }
+
+            if (newObj) {
+                slide.objects.push(newObj);
+                selectedObjectId = newObj.id;
+                renderSlideCanvas();
+                renderThumbnails();
+
+                if (window.innerWidth < 1024) {
+                    switchMobileView('canvas');
+                }
+            }
+        }
+
+        function addChart(type) {
+            const slide = presentationData.slides[currentSlideIndex];
+            const newObj = {
+                id: `obj_${Date.now()}`,
+                type: 'chart',
+                chartType: type,
+                x: 20, y: 20, width: 50, height: 50,
+                dataStr: "1月, 20\n2月, 45\n3月, 28\n4月, 80",
+                animation: 'none'
+            };
+            slide.objects.push(newObj);
+            selectedObjectId = newObj.id;
+            renderSlideCanvas();
+            renderThumbnails();
+
+            if (window.innerWidth < 1024) {
+                switchMobileView('canvas');
+            }
+        }
+
+        function updateChartData(dataStr) {
+            const slide = presentationData.slides[currentSlideIndex];
+            const obj = slide.objects.find(o => o.id === selectedObjectId);
+            if (obj && obj.type === 'chart') {
+                obj.dataStr = dataStr;
+                renderSlideCanvas();
+            }
+        }
+
+        function addCodeBlock() {
+            const slide = presentationData.slides[currentSlideIndex];
+            const newObj = {
+                id: `obj_${Date.now()}`,
+                type: 'code',
+                x: 20, y: 20, width: 50, height: 35,
+                content: "// JavaScript Code Sample\nfunction greet(name) {\n    return 'Hello, ' + name + '!';\n}\nconsole.log(greet('Slas User'));",
+                animation: 'none'
+            };
+            slide.objects.push(newObj);
+            selectedObjectId = newObj.id;
+            renderSlideCanvas();
+            renderThumbnails();
+
+            if (window.innerWidth < 1024) {
+                switchMobileView('canvas');
+            }
+        }
+
+        function initPenCanvas() {
+            const canvas = document.getElementById('penCanvas');
+            penCtx = canvas.getContext('2d');
+
+            function resizePenCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            }
+            resizePenCanvas();
+            window.addEventListener('resize', resizePenCanvas);
+
+            const startDrawing = (e) => {
+                if (!isPenMode) return;
+                isDrawing = true;
+                const rect = canvas.getBoundingClientRect();
+                const coords = getEventCoords(e);
+                penCtx.beginPath();
+                penCtx.moveTo(coords.clientX - rect.left, coords.clientY - rect.top);
+            };
+
+            const drawMove = (e) => {
+                if (!isPenMode || !isDrawing) return;
+                if (e.cancelable) e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const coords = getEventCoords(e);
+                penCtx.strokeStyle = document.getElementById('penColor').value;
+                penCtx.lineWidth = document.getElementById('penWidth').value;
+                penCtx.lineCap = 'round';
+                penCtx.lineTo(coords.clientX - rect.left, coords.clientY - rect.top);
+                penCtx.stroke();
+            };
+
+            const stopDrawing = () => {
+                if (!isPenMode) return;
+                isDrawing = false;
+                saveCurrentSlideDrawing();
+            };
+
+            canvas.onmousedown = startDrawing;
+            canvas.onmousemove = drawMove;
+            canvas.onmouseup = stopDrawing;
+
+            canvas.ontouchstart = startDrawing;
+            canvas.ontouchmove = drawMove;
+            canvas.ontouchend = stopDrawing;
+        }
+
+        function togglePenMode() {
+            isPenMode = !isPenMode;
+            const btn = document.getElementById('penToggleBtn');
+            const text = document.getElementById('penStatusText');
+            const canvas = document.getElementById('penCanvas');
+
+            if (isPenMode) {
+                btn.className = "px-2.5 sm:px-3 py-1.5 border border-amber-500 rounded flex items-center space-x-1.5 text-white bg-amber-500 shadow-sm shrink-0";
+                text.innerText = "ペン: ON";
+                canvas.style.pointerEvents = 'auto';
+            } else {
+                btn.className = "px-2.5 sm:px-3 py-1.5 border border-slate-300 rounded flex items-center space-x-1.5 text-slate-700 bg-slate-50 shrink-0";
+                text.innerText = "ペン: OFF";
+                canvas.style.pointerEvents = 'none';
+            }
+        }
+
+        function saveCurrentSlideDrawing() {
+            const canvas = document.getElementById('penCanvas');
+            const slide = presentationData.slides[currentSlideIndex];
+            slide.penDrawingData = canvas.toDataURL();
+            renderThumbnails();
+        }
+
+        function loadCurrentSlideDrawing() {
+            const canvas = document.getElementById('penCanvas');
+            const slide = presentationData.slides[currentSlideIndex];
+            penCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (slide.penDrawingData) {
+                const img = new Image();
+                img.onload = () => {
+                    penCtx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                };
+                img.src = slide.penDrawingData;
+            }
+        }
+
+        function clearCurrentSlideDrawing() {
+            const canvas = document.getElementById('penCanvas');
+            penCtx.clearRect(0, 0, canvas.width, canvas.height);
+            presentationData.slides[currentSlideIndex].penDrawingData = null;
+            renderThumbnails();
+        }
+
+        function setObjectAnimation(type) {
+            updateObjProp('animation', type);
+        }
+
+        function playObjectAnimationPreview() {
+            renderSlideCanvas();
+        }
+
+        function saveSlasFile() {
+            saveCurrentSlideDrawing();
+            const jsonStr = JSON.stringify(presentationData, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `presentation_${Date.now()}.slas`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadSlasFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data && data.slides && Array.isArray(data.slides)) {
+                        presentationData = data;
+                        currentSlideIndex = 0;
+                        selectedObjectId = null;
+                        renderThumbnails();
+                        renderSlideCanvas();
+                    } else {
+                        alert("無効な .slas ファイル形式です。");
+                    }
+                } catch (err) {
+                    alert("ファイルの読み込みに失敗しました。");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function startPresentation() {
+            saveCurrentSlideDrawing();
+            const overlay = document.getElementById('presentationOverlay');
+            overlay.classList.remove('hidden');
+            renderSlideCanvas(true);
+        }
+
+        function endPresentation() {
+            const overlay = document.getElementById('presentationOverlay');
+            overlay.classList.add('hidden');
+            renderSlideCanvas(false);
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < presentationData.slides.length - 1) {
+                currentSlideIndex++;
+                renderSlideCanvas(true);
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIndex > 0) {
+                currentSlideIndex--;
+                renderSlideCanvas(true);
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>

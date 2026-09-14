@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>おにぎり製造工場 〜謎の男〜</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #0c0c0e;
+            color: #e4e4e7;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+        }
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.15);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(113, 113, 122, 0.4);
+            border-radius: 2px;
+        }
+        /* Monochrome metallic scanline effect */
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 18, 20, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.05), rgba(255, 255, 255, 0.03));
+            background-size: 100% 4px, 6px 100%;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        /* Vignette effect for depth and shadow */
+        .vignette {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 120px rgba(0,0,0,0.95);
+            z-index: 11;
+            pointer-events: none;
+        }
+        /* Gray glow text for industrial mystery vibe */
+        .glow-zinc {
+            text-shadow: 0 0 10px rgba(244, 244, 245, 0.6), 0 0 20px rgba(113, 113, 122, 0.4);
+        }
+        /* Screen shake animation for damage or shocks */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            10% { transform: translate(-5px, -5px) rotate(-1deg); }
+            30% { transform: translate(5px, 3px) rotate(1deg); }
+            50% { transform: translate(-3px, 5px) rotate(-0.5deg); }
+            70% { transform: translate(3px, -3px) rotate(1deg); }
+            90% { transform: translate(-2px, 2px) rotate(-0.5deg); }
+        }
+        .shake-active {
+            animation: shake 0.4s ease-in-out;
+        }
+        /* Sliding puzzle board styling */
+        .puzzle-cell {
+            transition: all 0.2s ease-in-out;
+        }
+    </style>
+</head>
+<body class="relative w-full h-screen flex flex-col items-center justify-center select-none overflow-hidden">
+
+    <!-- 3D WebGL Viewport -->
+    <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
+
+    <!-- UI Overlay Systems -->
+    <div class="absolute inset-0 w-full h-full z-20 flex flex-col justify-between pointer-events-none p-4 md:p-6">
+        
+        <!-- Header (Control & System Status) -->
+        <div class="w-full flex justify-between items-center pointer-events-auto">
+            <!-- Left: Stage title with Steel Gray theme -->
+            <div id="game-stage-indicator" class="bg-zinc-950/95 border border-zinc-700/60 text-zinc-300 px-4 py-2 rounded-lg text-xs font-mono flex items-center gap-2.5 shadow-xl shadow-black/80">
+                <span id="pulsing-dot" class="w-2.5 h-2.5 rounded-full bg-zinc-400 animate-pulse"></span>
+                <span id="stage-title" class="tracking-wide">EPISODE 1: 謎の影</span>
+            </div>
+
+            <!-- Right: Utility Controls (Fullscreen, Mute, System Reset) -->
+            <div class="flex gap-2">
+                <button onclick="toggleFullscreen()" class="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-400 hover:text-zinc-200 p-2.5 rounded-lg transition-all text-sm pointer-events-auto shadow-lg" title="全画面表示">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+                <button onclick="resetGameSave()" class="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/40 text-zinc-400 hover:text-zinc-200 p-2.5 rounded-lg transition-all text-sm pointer-events-auto shadow-lg" title="データを最初からやり直す">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Alert / Warning Screen overlay for events -->
+        <div id="center-notification" class="hidden self-center bg-zinc-900/95 border-2 border-zinc-400 text-zinc-100 px-6 py-4 rounded-xl max-w-md text-center pointer-events-auto shadow-2xl animate-bounce z-50">
+            <h3 class="font-bold text-lg mb-1.5 glow-zinc"><i class="fa-solid fa-circle-notch animate-spin mr-2"></i>通知 / 進展</h3>
+            <p id="notification-text" class="text-sm font-semibold text-zinc-300"></p>
+        </div>
+
+        <!-- Bottom Game Interaction & Dialogue Center -->
+        <div class="w-full max-w-4xl mx-auto flex flex-col gap-3 pointer-events-auto mb-2">
+            
+            <!-- Contextual Interactive Puzzles (Must clear this to proceed!) -->
+            <div id="interaction-panel" class="hidden bg-zinc-950/95 border-2 border-zinc-700 rounded-xl p-5 shadow-2xl text-center">
+                <!-- Content injected dynamically based on stage -->
+            </div>
+
+            <!-- Main Narrative Dialogue Box -->
+            <div id="dialogue-box" class="bg-zinc-900/95 border-2 border-zinc-800 rounded-xl p-4 md:p-5 flex flex-col justify-between shadow-2xl transition-all duration-300 relative">
+                <!-- Active Speaker name -->
+                <div class="absolute -top-3 left-4 bg-zinc-900 border border-zinc-600 px-3 py-0.5 rounded text-xs font-bold text-zinc-300 uppercase tracking-widest" id="speaker-name">
+                    ナレーション
+                </div>
+                
+                <div class="flex flex-col md:flex-row items-center gap-5 min-h-[110px]">
+                    <!-- Character Portrait/Thumbnail representing item - SIGNIFCANTLY LARGER -->
+                    <div id="portrait-wrapper" class="flex-shrink-0 w-24 h-24 bg-zinc-950 border-2 border-zinc-700/80 rounded-xl flex items-center justify-center text-6xl shadow-inner relative overflow-hidden">
+                        <span id="char-portrait">🍙</span>
+                        <!-- Status Badge for Character -->
+                        <span id="char-status" class="absolute bottom-0 right-0 text-[11px] bg-zinc-800 border-t border-l border-zinc-700 text-zinc-300 px-2 py-0.5 font-bold">生</span>
+                    </div>
+
+                    <!-- Narrative dialogue content -->
+                    <div class="flex-grow text-left w-full overflow-y-auto max-h-[120px] custom-scrollbar">
+                        <p id="dialogue-text" class="text-sm md:text-base leading-relaxed text-zinc-100 font-medium whitespace-pre-line">
+                            テレビの画面に、最近多発している不気味な子ども誘拐事件のニュースが映し出されている。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="flex justify-between items-center mt-3 pt-3 border-t border-zinc-800/60 font-sans">
+                    <div class="text-xs text-zinc-500 font-mono">
+                        進行状況: <span id="progress-indicator">1</span> / 173
+                    </div>
+
+                    <!-- Input instructions/Actions -->
+                    <div class="flex gap-2">
+                        <button id="btn-back" onclick="previousStep()" class="hidden bg-zinc-900 hover:bg-neutral-800 border border-zinc-700 text-zinc-400 px-4 py-1.5 rounded-lg text-xs transition font-semibold">
+                            <i class="fa-solid fa-chevron-left mr-1"></i> 戻る
+                        </button>
+                        <button id="btn-next" onclick="nextStep()" class="bg-zinc-850 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 px-5 py-1.5 rounded-lg text-xs transition font-bold flex items-center gap-2">
+                            進む <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini HUD for active items & Saves -->
+            <div class="flex justify-between items-center text-xs text-zinc-500 px-2">
+                <div id="inventory-display" class="flex gap-2">
+                    <!-- Dynamic inventory items show up here -->
+                </div>
+                <!-- Save Status indicator (Requested) -->
+                <div id="save-status" class="flex items-center gap-1.5 opacity-0 transition-opacity duration-500 font-mono text-zinc-300 bg-zinc-800/40 border border-zinc-700/30 px-2 py-0.5 rounded">
+                    <i class="fa-solid fa-floppy-disk animate-bounce"></i> Auto-Saved
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Retro ambient layers -->
+    <div id="scary-overlay" class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <script>
+        // --- GAME SYSTEM DATA (173 STAGES) ---
+        const gameStory = [
+            { id: 1, title: "日常の終わり", speaker: "テレビ報道", portrait: "📺", status: "放送", text: "「速報です。各地で子どもの連続誘拐事件が相次いで発生しています。目撃情報によると、現場には不審な米粒のようなものが散乱しており…」" },
+            { id: 2, title: "不審な訪問者", speaker: "あなた", portrait: "🏠", status: "自宅", text: "ピンポーン…\n玄関のチャイムが鳴る。宅配便だろうか？こんな遅い時間におかしい。" },
+            { id: 3, title: "襲撃", speaker: "ツナマヨ（おにぎり）", portrait: "🍙", status: "襲撃", text: "ガチャ…扉を開けた瞬間、突如目の前に巨大な「ツナマヨおにぎり」が現れ、手にしたハンマーを大きく振り下ろした！\nドゴォッ！強烈な衝撃に、あなたの意識は急速に遠のいていく…" },
+            { id: 4, title: "目覚めと異変", speaker: "あなた", portrait: "🍙", status: "変化", text: "「ううっ…ここは…？」\n目を覚ますと、そこは薄暗い鉄格子の牢屋だった。ふと自分の身体を見ると…信じられないことに、真っ白なご飯と海苔に包まれた「おにぎり」の姿に変えられていた！" },
+            { id: 5, title: "隣の囚人", speaker: "天むすおにぎり", portrait: "🍤", status: "囚人", text: "「おい…君も目を覚ましたかい？」\n隣の牢屋にも、同じくおにぎりに改造されてしまった「天むすおにぎり」が閉じ込められている。ひどく怯えているようだ。" },
+            { id: 6, title: "脱出の糸口", speaker: "あなた", portrait: "💨", status: "探索", text: "牢屋の隅を見上げると、格子が外れかかった古い排気口を見つけた。おにぎりのサイズならなんとか通れそうだ。ここから外へ潜入しよう！" },
+            { id: 7, title: "果てなき暗闇", speaker: "あなた", portrait: "🗺️", status: "分析", text: "通気口に這い上がると、中はいびつな金属パイプが無限に続いているように見える。天むすが捕らえられている牢屋は、ここから遠く離れた別の場所にあるようだ。" },
+            { id: 8, title: "迷宮のパイプ", speaker: "あなた", portrait: "🌀", status: "通気口", text: "【アクション: 左右どちらかに曲がって進め！】\nくねくねと長く続く、暗く不気味な通気口。正しいルートを選択して奥へ進まなければならない。", interactive: "navigate_duct_1" },
+            { id: 9, title: "背後の脅威", speaker: "狂った梅干しおにぎり", portrait: "👺", status: "催眠", text: "「キシャーッ！！」\nガサゴソと背後から激しい音が！振り返ると、お面を被り、目を血走らせた「梅干しおにぎり」が包丁を片手にこちらへ這い寄ってくる！催眠状態のようだ、早く逃げろ！" },
+            { id: 10, title: "分かれ道", speaker: "あなた", portrait: "🚪", status: "分岐", text: "目の前に3本の分かれ道が現れた。真ん中の道には頑丈な鉄の扉がそびえ立っている。右、左、中央。どこに行く？", interactive: "choose_path_1" },
+            { id: 11, title: "左の道: 陥没地帯", speaker: "あなた", portrait: "🕳️", status: "危険", text: "【アクション: タイミングよく跳べ！】\n左に進むと、地面が深く陥没している危険な場所があった。向こう岸に見える光る物体は…天むすの牢屋の鍵だ！落下しないように慎重にジャンプしろ！", interactive: "jump_abyss" },
+            { id: 12, title: "中央の道: 校長室のような部屋", speaker: "あなた", portrait: "🏫", status: "校長室", text: "真ん中の扉を開けると、そこは豪華だが不気味な校長室のような部屋だった。埃をかぶった机の上には、古い手紙とビデオテープが残されている。" },
+            { id: 12.1, title: "さらなる通気口へ", speaker: "おかかおにぎり", portrait: "🎭", status: "敵？", text: "部屋の奥の通気口をさらに辿っていくと、お面を被った別の「おかかおにぎり」がうろついているのを発見した！" },
+            { id: 12.2, title: "手に入れた火種", speaker: "あなた", portrait: "🔥", status: "入手", text: "おかかおにぎりはあなたの影に驚き、慌てて逃げ出していった。その際、チャキッと金属のライターを床に落とした。これは使えそうだ！（ライターを入手しました）", item: "ライター" },
+            { id: 12.3, title: "二重ロックを焼き切れ", speaker: "あなた", portrait: "🗝️", status: "解除", text: "【アクション: 火を灯せ！】\n手に入れたライターを使用し、天むすの牢屋の手前にある頑丈な熱収縮ゴム製のセキュリティロックを焼き切った！これで鍵が使用可能になった！", interactive: "burn_lock" },
+            { id: 13, title: "右の道: 見下ろす影", speaker: "おかかおにぎり", portrait: "👺", status: "威嚇", text: "（条件達成: 鍵とロック解除ルートを見た場合）\n右の通路の暗闇を進むと、頭上の鉄柵から、先ほどのお面を被った「おかかおにぎり」がこちらを冷酷に見下ろしているのが見えた。背筋が凍る。" },
+            { id: 14, title: "再会", speaker: "天むすおにぎり", portrait: "🍤", status: "救出", text: "鍵を差し込み、ついに天むすを牢屋から助け出すことに成功した！\n「ありがとう！死ぬかと思ったよ！」\n僕たちは一緒に元の牢屋前へ戻ることにした。" },
+            { id: 15, title: "忍び寄る視線", speaker: "鮭おにぎり", portrait: "🐟", status: "追跡", text: "ガタッ…\n元の場所へ戻ったその時、通路の物陰から誰かがこちらをつけている気配を感じた。現れたのは、ひどく震えている「鮭おにぎり」だった。" },
+            { id: 16, title: "おびえる鮭おにぎり", speaker: "鮭おにぎり", portrait: "🐟", status: "告白", text: "「お、お願いだ、僕をいじめないでくれ！…僕は廃棄されたくないんだ。『海鮮丼様』の言う通りにしないと、すぐにあの廃棄処分箱に入れられてしまう！」" },
+            { id: 16.1, title: "恐怖の絶対システム", speaker: "鮭おにぎり", portrait: "🍚", status: "解説", text: "彼の話によると、この工場の敵のおにぎり達は全て「海鮮丼」という絶対的な支配者に命令されており、少しでも逆らえば即座に生きたまま廃棄箱に捨てられてしまうらしい。" },
+            { id: 16.2, title: "洗脳のメカニズム", speaker: "鮭おにぎり", portrait: "🌀", status: "解説", text: "「逆らおうとしたおにぎりは、お面を被らされて強力な催眠術をかけられ、自分の意思を失ったただの労働人形にされちゃうんだ…」" },
+            { id: 17, title: "消えた仲間", speaker: "あなた", portrait: "👥", status: "探索", text: "あなた、天むす、そして協力を求めてきた鮭おにぎりは、海鮮丼の悪事を止めるべく工場を探索し始めた。しかし、ふと気づくと後ろを歩いていたはずの鮭おにぎりの姿がない！" },
+            { id: 18, title: "新たな拘束者", speaker: "あなた", portrait: "🕸️", status: "発見", text: "鮭を探して奥の区画へ行くと、そこには先ほどライターを落とした「おかかおにぎり」も、命令に背いた罪で別の頑丈な牢屋に閉じ込められているのを見つけた。" },
+            { id: 19, title: "記憶ゲームの仕掛け", speaker: "昆布おにぎり", portrait: "👾", status: "催眠", text: "「ヒヒヒッ！鮭を助けたくば、このゲームをクリアするのだ！」\nそこに催眠状態の「昆布おにぎり」が立ちはだかり、恐ろしいゲーム盤を起動した！" },
+            { id: 19.1, title: "狂気の不条理ゲーム", speaker: "あなた", portrait: "⚠️", status: "挑戦", text: "【アクション: バグボタンを押せ！】\n記憶ゲームが暴走を始めた！このままではクリア不可能。急いでランダムに動き回る『⚠️ボタン』を探して破壊しろ！", interactive: "memory_game_hack" },
+            { id: 19.2, title: "迫り来る切断刃", speaker: "あなた", portrait: "⚙️", status: "時間制限", text: "チクタク…チクタク…\n時間が経過するほど、おかかおにぎりの頭上から巨大な鋸（のこぎり）の刃がじわじわと降りてくる！急ぐんだ！" },
+            { id: 20, title: "昆布の逃亡", speaker: "昆布おにぎり", portrait: "🏃", status: "退却", text: "「な、何だと！？バグを起こしたか！」\nシステムを壊された昆布は、捨て台詞を吐きながら工場の奥へと逃げていった。その際、床に1枚のくしゃくしゃの紙を落とした。" },
+            { id: 21, title: "おかかの告白", speaker: "おかかおにぎり", portrait: "🍙", status: "解放", text: "記憶システムの破壊と同時に、おかかの牢屋の扉がガチャリと開いた！\n「ふう、助かったよ…本当にありがとう。」" },
+            { id: 22, title: "仕組まれたライター", speaker: "おかかおにぎり", portrait: "🔥", status: "真実", text: "「実はあの時、君たちに天むすを助けて欲しくて、僕はわざと気づかれるようにライターを落としたんだ。僕もこんな洗脳工場を壊したいと思っていた…」" },
+            { id: 23, title: "失格の宣告", speaker: "不気味な声", portrait: "👤", status: "襲撃", text: "『――失格。――』\n突如、天井のスピーカーから、低く地響きのような重々しい声が響き渡った。天井から巨大なアームが降りてきて、おかかを乱暴に掴み上げた！" },
+            { id: 23.1, title: "廃棄", speaker: "あなた", portrait: "🗑️", status: "絶望", text: "「うわあああ！」\n叫ぶおかかは、あなたの目の前でガラガラと音を立てる真っ暗な『廃棄処分箱』の中へと放り込まれ、二度と出てこなくなった…" },
+            { id: 24, title: "斧を持った狂気", speaker: "昆布おにぎり", portrait: "🪓", status: "追跡", text: "「みぃ〜つ〜け〜たぁ〜！」\n先ほど逃げたはずの昆布おにぎりが、巨大な斧を両手で振り回しながら、狂った笑い声をあげて突進してきた！逃げるしかない！" },
+            { id: 25, title: "仲間たちの捕獲", speaker: "あなた", portrait: "🕸️", status: "絶望", text: "「キャーッ！」、「うわっ！」\n逃げる途中で天むすと鮭おにぎりが昆布の繰り出した罠に引っかかり、再び牢屋へと連れ去られてしまった！" },
+            { id: 26, title: "古びた吊り橋", speaker: "あなた", portrait: "🌉", status: "逃走", text: "一人きりになったあなたは、工場内の深い谷底にかけられた、今にも崩れそうな木製の古い吊り橋にたどり着いた。下は真っ暗な奈落だ。" },
+            { id: 27, title: "吊り橋を崩せ！", speaker: "あなた", portrait: "🪓", status: "死闘", text: "【アクション: 橋を崩せ！】\n昆布が橋を渡りきる前に、橋の主柱を叩いて壊さなければ、追いつかれてゲームオーバーになってしまう！", interactive: "break_bridge" },
+            { id: 28, title: "待ち伏せ", speaker: "狂った梅干しおにぎり", portrait: "👺", status: "捕獲", text: "なんとか橋を落としたものの、反対側の出口を抜けた直後、待ち伏せていたお面を被った「梅干しおにぎり」の硬い米粒に押し潰され、あなたは拘束されてしまった…" },
+            { id: 29, title: "恐怖の幹部会議", speaker: "カレーライス", portrait: "🍛", status: "幹部", text: "目が覚めると、あなたは大きな円卓に縛り付けられていた。そこに座っていたのは、あなたを捕らえた面々、そしてこの工場の上層部である「カレーライス」だった。" },
+            { id: 30, title: "ヨウ素液の刑", speaker: "カレーライス", portrait: "🍛", status: "執行", text: "カレーは震える鮭おにぎりを睨みつけた。「なぜ命令を無視した？」\n鮭が黙秘すると、カレーは冷酷に「ヨウ素液」を取り出し、鮭の身体にかけた。白い米がみるみる青紫色に変色し、彼は悲鳴を上げて動かなくなった…！" },
+            { id: 31, title: "命がけの脱走", speaker: "ツナマヨ（おにぎり）", portrait: "🍙", status: "離反", text: "その惨劇に全員が凍りつく中、かつてあなたを襲ったツナマヨが「もう耐えられない！」と叫び、拘束のロープを噛み切った！あなたと天むす、ツナマヨは走り出した！" },
+            { id: 31.1, title: "ツナマヨの真意", speaker: "ツナマヨ（おにぎり）", portrait: "🍙", status: "共闘", text: "「僕だって本当はこんなことしたくなかったんだ！鮭のようになるのはもう嫌だ！」彼も洗脳に怯えて従っていただけだったのだ。" },
+            { id: 32, title: "ツナマヨ、散る", speaker: "ツナマヨ（おにぎり）", portrait: "🩹", status: "犠牲", text: "「あの時は殴って本当にごめん…ここは僕が食い止める！みんなは先に行け！」\nツナマヨは負傷した身体を投げ出し、背後から迫るカレーの前に立ちふさがった。" },
+            { id: 33, title: "重傷の友を背負って", speaker: "天むすおにぎり", portrait: "🍤", status: "逃走", text: "「ツナマヨ！うう, 諦めるな！」\n激闘の末、満身創痍になったツナマヨを天むすが背負い、あなたたちは必死に工場の迷路を突き進んだ。" },
+            { id: 34, title: "梅干しの執念", speaker: "梅干しおにぎり", portrait: "👺", status: "妨害", text: "【アクション: 左右に避けろ！】\n廊下の角から、お面を被った梅干しがタックルを仕掛けてくる！タイミングよく素早く回避しろ！", interactive: "dodge_plum" },
+            { id: 35, title: "地図の導き", speaker: "あなた", portrait: "🗺️", status: "作戦", text: "ツナマヨが気絶寸前で手渡してくれた『施設内案内図』を開く。そこには人間に戻るための「秘薬の調合室」の場所が記されていた！" },
+            { id: 36, title: "調合室へのスニーク", speaker: "あなた", portrait: "🤫", status: "ステルス", text: "警備の目が張り巡らされた廊下を、配管の影に隠れながら進む。少しでも音を立てれば、即座に監視ドローンに見つかってしまう。" },
+            { id: 37, title: "解読不能のレシピ", speaker: "あなた", portrait: "📝", status: "調合室", text: "なんとか調合室に到達したが、薬を作る機材はあるものの作り方が不明だ。しかし、先ほど昆布おにぎりが落としていった紙を見ると、そこに調合の手順が書かれていた！" },
+            { id: 38, title: "素材集めの分散ミッション", speaker: "あなた", portrait: "🏃", status: "クエスト", text: "ツナマヨは部屋で治療を行い、あなたと天むすで調合に必要な「3つの材料」を工場中から手分けして探すことになった。梅干しおにぎりが妨害のために巡回している。気をつけて！" },
+            { id: 39, title: "3つの秘薬素材", speaker: "システム", portrait: "🧪", status: "メモ", text: "【調合レシピ】\n1. ヨウ素液 (澱粉変化を戻す鍵)\n2. たんぽぽ (工場の脇に自生する薬草)\n3. 液体窒素 (冷却保存用)" },
+            { id: 40, title: "材料の捜索へ", speaker: "あなた", portrait: "🧭", status: "探索", text: "【アクション: 障害物を避けながら材料を捕まえろ！】\n工場内を不規則に飛び回る「ヨウ素液🧪」「たんぽぽ🌼」「液体窒素❄️」をタイミングよくタップして集めろ！ただし、飛び回る障害物（スパナ🔧や汚物）に触ると、集めた数がリセットされてしまう！", interactive: "collect_ingredients" },
+            { id: 41, title: "奇跡の調合", speaker: "あなた", portrait: "⚗️", status: "調合", text: "「よし、全ての材料が揃った！」\nフラスコに入れられた成分が激しく泡立ち、やがて美しい黄金色の液体へと変化した。" },
+            { id: 42, title: "人間化", speaker: "あなた", portrait: "🚶", status: "復活", text: "「ゴクッ、ゴクッ…」\n薬を一気に飲み干すと、身体が猛烈に熱くなった。ご飯の身体が徐々に皮膚に、海苔が衣服へと再構成され、ついに人間の姿を取り戻した！" },
+            { id: 43, title: "脱出ルート", speaker: "あなた", portrait: "🏃", status: "脱出", text: "ツナマヨと天むすも元の子供の姿へと戻った。人間に戻ったあなたたちは、ツナマヨが持っていた隠し通路の地図を頼りに、工場から一気に地上へと駆け出した！" },
+            { id: 44, title: "我が家へ", speaker: "ナレーション", portrait: "🏡", status: "日常", text: "数々の恐ろしい体験を乗り越え、あなたたちはそれぞれの日常へと戻っていった。もうあのような悪夢は二度と起こらないと信じて…" },
+            { id: 45, title: "一ヶ月後...", speaker: "ナレーション", portrait: "📅", status: "時間経過", text: "―― 一ヶ月が経過した。平穏な日常が戻ったある晴れた日の午後、上空から突然、耳を裂くようなヘリコプターのプロペラ音が聞こえてきた。" },
+            { id: 46, title: "最悪の再会", speaker: "海鮮丼", portrait: "🚁", status: "黒幕", text: "庭に出ると、ヘリから降りてきたのは高級スーツを着た「海鮮丼」だった！\n「ふふふ…よくも逃げてくれたな。どこへ行こうと無駄だ！」" },
+            { id: 47, title: "親子丼への強制改造", speaker: "ナレーション", portrait: "🐔", status: "変化", text: "あなたは麻酔銃で撃たれ、再び拉致されてしまった。次に目が覚めた時、身体はおにぎりではなく、鶏肉と黄金の卵に塗れた「親子丼」へと改造されていたのだ！" },
+            { id: 48, title: "地獄のオーディションルーム", speaker: "海鮮丼", portrait: "🎭", status: "地獄", text: "連れて行かれたのは巨大なオーディションルーム。その部屋の隅には、怪しくうごめく不気味な「廃棄処分箱」がポッカリと口を開けて待っている。" },
+            { id: 49, title: "10のおおにぎり達", speaker: "ナレーション", portrait: "🍙", status: "異常", text: "天井のハッチが開き、ボトボトと10個の新しいおにぎりたちが床に落ちてきた。どれも怯えた目をしている。" },
+            { id: 50, title: "狂気のタスク", speaker: "海鮮丼", portrait: "🎵", status: "命令", text: "「お前たちのテストだ。『海鮮丼は偉大なり』と連呼し、狂ったダンスを踊りながらパンを食べろ。できん奴は廃棄処分だ！」" },
+            { id: 51, title: "選別の義務", speaker: "海鮮丼", portrait: "🗑️", status: "仕事", text: "「親子丼よ、タスクをクリアできなかったおにぎりを自分の手で廃棄処分箱に放り込め。さあ、選別を始めるのだ」" },
+            { id: 52, title: "命乞い", speaker: "おにぎり達", portrait: "🥺", status: "命乞い", text: "「ごめんなさい、ちゃんとダンスします！パンも食べます！だから入れないで！捨てないでください！（ ; ; ）」" },
+            { id: 53, title: "葛藤と恐怖", speaker: "海鮮丼", portrait: "👹", status: "時間制限", text: "【アクション: 葛藤に決着を！】\nあまりの惨さに躊躇していると、海鮮丼の怒りのゲージが上昇していく！急いで決断を選択せよ！", interactive: "sacrifice_or_not" },
+            { id: 54, title: "引き換えの1万円", speaker: "海鮮丼", portrait: "💴", status: "報酬", text: "選別作業を終えたあなたに、海鮮丼は泥のついた1万円札を握らせた。「よくやった。お前の今日の給料だ。これで美味いものでも食うがいい」" },
+            { id: 55, title: "明日の予告", speaker: "海鮮丼", portrait: "📆", status: "継続", text: "「明日も同じ時間にここへ来い。お前にはまだまだやってもらう仕事が山ほどあるからな、ハッハッハ！」" },
+            { id: 56, title: "叛逆の計画", speaker: "あなた", portrait: "🧠", status: "企み", text: "こんな仕事を毎日続けられるわけがない。おにぎりたちの涙が脳裏に焼き付いている。あなたは密かに脱出と海鮮丼を破滅させる計画を練り始めた。" },
+            { id: 57, title: "毒入りクッキー", speaker: "海鮮丼", portrait: "🍪", status: "罠", text: "海鮮丼はあなたの不穏な空気を察知していた。別れ際、「これを食べて元気を出せ」と綺麗な袋に入ったクッキーを渡してきた。その中に毒が入っているとも知らずに…" },
+            { id: 58, title: "死の甘味", speaker: "あなた", portrait: "🍪", status: "摂取", text: "自宅に戻り、何も考えずにそのクッキーを口に運んだ。一口食べた瞬間、喉を焼くような激痛が走る！" },
+            { id: 59, title: "救急搬送", speaker: "救急隊員", portrait: "🚑", status: "救急", text: "「もしもし！しっかりしてください！」\nあなたは倒れ、激しく痙攣した。通報を受けた救急車がサイレンを鳴らし、夜の街を爆走していく。" },
+            { id: 60, title: "3日間の入院宣告", speaker: "医師", portrait: "🏥", status: "入院", text: "病院で目が覚めると、毒の致命的な効果は消えていた。しかし、身体中に耐え難い「だるさ」が残っており、3日間の強制入院が決まった。" },
+            { id: 61, title: "深夜の訪問者", speaker: "看護師", portrait: "👩‍⚕️", status: "不気味", text: "その夜。病室のドアが静かに開き、無表情な看護師が入ってきた。「こんばんは。少し退屈でしょう？私と『ゲーム』をしましょう…」" },
+            { id: 62, title: "拒絶", speaker: "あなた", portrait: "🙅", status: "恐怖", text: "本能的な恐怖を覚えたあなたは、掛け布団を引き上げて首を振った。「いえ、結構です。もう寝ますのでお引き取りください…」" },
+            { id: 63, title: "ゲームのルール", speaker: "豹変した看護師", portrait: "👹", status: "ゲーム", text: "瞬間、看護師の顔が鬼のような形相に変貌した！\n「ふふふ、拒否権はないのよ。ルールはこうよ。あなたが私を見ている間、私は動けない。でも、視線を外した瞬間…あなたとの距離を詰めるわ」" },
+            { id: 64, title: "だるまさんが転んだ(1)", speaker: "あなた", portrait: "🏃", status: "だるま", text: "悲鳴を上げて病室を飛び出す！廊下を全速力で走るが、身体のだるさで足がもつれる。振り返ると奴は動いていない…だが確実に近づいている！" },
+            { id: 65, title: "バッテリーと電子扉", speaker: "あなた", portrait: "🔋", status: "パズル", text: "【アクション: バッテリー回路（スライドパズル）を完成させろ！】\n電子扉の配線システムだ！パネルをタップしてスライドさせ、バッテリーの電子図面（1〜8を正しい順番に整列）を完成させてゲートを開け！", interactive: "insert_battery" },
+            { id: 65.1, title: "過酷になる周回", speaker: "あなた", portrait: "🔋", status: "パズル2", text: "【アクション: さらに複雑化したスライドパズルを解け！】\n次のゲートだ。シャッフル難易度の増したバッテリーの電子回路スライドパズルを高速で解き明かせ！", interactive: "insert_battery_hard" },
+            { id: 66, title: "出口の光", speaker: "あなた", portrait: "🚪", status: "脱出", text: "最後のバッテリーをはめ込み、非常口の重い扉が勢いよく開いた！外の冷たい空気を吸い込んだ瞬間、だるさが完全に消失した。" },
+            { id: 67, title: "油断という名の死", speaker: "あなた", portrait: "💀", status: "落とし穴", text: "「助かった…！」そう言って振り返った瞬間、あなたはゲーム中であったことを忘れていた。暗闇から伸びた看護師の爪が、あなたの胸を深く貫いた――" },
+            { id: 68, title: "不滅の来世へ", speaker: "謎の声", portrait: "🌌", status: "輪廻", text: "画面が真っ暗になり、不思議な文字が浮かび上がる。\n『主人公が死んだら、そこですべてが終わりだと思うよね？…ふふ、残念。僕にはまだ「来世」があるんだよ。』" },
+            { id: 69, title: "生まれ変わり", speaker: "少女（あなた）", portrait: "👶", status: "転生", text: "温かい光に包まれ、再びこの世に生を受けた時、あなたは全く別の人間――「女の子」として生まれていた。" },
+            { id: 70, title: "12歳の少女", speaker: "少女（あなた）", portrait: "👧", status: "成長", text: "月日は流れ、あなたは12歳の大変可愛らしい少女へと成長していた。しかし、あなたの魂の奥底には、あの前世の記憶が薄く残っていた。" },
+            { id: 71, title: "重なる悲劇", speaker: "ナレーション", portrait: "🪦", status: "悲劇", text: "しかし、過酷な運命は彼女を逃がさない。父親が不慮の交通事故で、そしてお母さんも重い病気で相次いでこの世を去ってしまい、少女は天涯孤独の身となった。" },
+            { id: 72, title: "新しい学校へのステップ", speaker: "少女（あなた）", portrait: "🎒", status: "体験入学", text: "中学生になるのを前に、あなたは近所にある古びた中学校の「3日間の体験入学」に参加することにした。" },
+            { id: 73, title: "最初の授業", speaker: "少女（あなた）", portrait: "📝", status: "授業", text: "初日の授業は、国語や数学など、至ってごく普通の内容だった。しかし、前世で異常な経験ばかりしてきたあなたにとって、「普通」であること自体が最大の奇妙さに思えた。" },
+            { id: 74, title: "休み時間の地獄", speaker: "少女（あなた）", portrait: "🚨", status: "警戒", text: "チャイムが鳴り、休み時間になった瞬間、学校の空気が一変した。廊下の非常ベルが狂ったように鳴り響く！" },
+            { id: 75, title: "赤いレーザー網", speaker: "ナレーション", portrait: "⚡", status: "システム", text: "廊下の天井から、不気味な赤いスキャンのレーザー光線が照射され、左右に激しく往復し始めた！" },
+            { id: 76, title: "動けば即死の廊下", speaker: "ナレーション", portrait: "🔫", status: "危険", text: "【アクション: 緑の瞬間にダッシュせよ！】\n赤い危険レーザーが照射されている時に動いたら自動機銃で撃ち殺される！安全な一瞬を狙って進め！", interactive: "laser_run" },
+            { id: 77, title: "地獄の初日、終了", speaker: "少女（あなた）", portrait: "🌅", status: "生存", text: "何人かの生徒の悲鳴が響く中、あなたは前世の危機回避能力をフルに使い、なんとか初日の授業と休み時間を生き延びて下校した。" },
+            { id: 78, title: "庭園の池の噂", speaker: "クラスメイト", portrait: "🤫", status: "噂", text: "2日目の朝、席が隣の生徒が震えながら耳打ちしてきた。「知ってる？この学校の中庭にある庭園の池の底に、誰も入っちゃいけない『謎の扉』があるらしいよ…」" },
+            { id: 79, title: "緊迫の2日目", speaker: "ナレーション", portrait: "🏫", status: "生存", text: "2日目も同様に、レーザースキャンによる死のゲームが行われた。あなたはただひたすら無言で時が過ぎるのを待ち、生き延びた。" },
+            { id: 80, title: "3日目の決意", speaker: "少女（あなた）", portrait: "💧", status: "飛び込み", text: "体験入学最終日。放課後、周囲に先生や監視ロボットがいない隙を見計らい、あなたは意を決して冷たい中庭の池の底へと飛び込んだ！" },
+            { id: 81, title: "水中ハッチ", speaker: "少女（あなた）", portrait: "🚪", status: "発見", text: "藻が生い茂る池の底を必死に手探りすると、泥にまみれた重い金属の扉が実在した。錆びついたレバーをコインシデンスの力で引く！" },
+            { id: 82, title: "浸水する制御室", speaker: "少女（あなた）", portrait: "⚙️", status: "浸水", text: "扉が開き, 中へ滑り込むとそこは精密な電子サーバーが立ち並ぶ巨大な部屋だった。しかし、池から流入した大量の水が激しい勢いで流れ込み、電子機械が壊れ始めた！" },
+            { id: 83, title: "絶たれた退路", speaker: "少女（あなた）", portrait: "🌊", status: "水没", text: "バタン！背後の扉が水圧で激しく閉まり、ロックされてしまった！またたく間に部屋の天井まで水が満ちていく。部屋は完全に水没した。" },
+            { id: 84, title: "意識の消失", speaker: "少女（あなた）", portrait: "🫧", status: "気絶", text: "「う、苦しい…誰か…！」\n肺の中の酸素が尽き、あなたは冷たい水の中で意識を失い、ゆっくりと沈んでいった…" },
+            { id: 85, title: "デジャブ", speaker: "少女（あなた）", portrait: "🏥", status: "覚醒", text: "「はっ！」\n目を覚ました。見覚えのある真っ白な天井、そして消毒液の匂い。ここは…前世で入院したあの不気味な病院の病室だ！" },
+            { id: 86, title: "悪夢の再来", speaker: "看護師", portrait: "👩‍⚕️", status: "出現", text: "病室のドアが開き、あの時と同じ看護師が入ってきた。その顔には、邪悪極まりない歪んだ笑みが浮かんでいる。" },
+            { id: 87, title: "おぼえていますか", speaker: "看護師", portrait: "👹", status: "脅迫", text: "「ふふふ。私のことを覚えているかしら？お久しぶりね。またゲームの続きをしましょう…」" },
+            { id: 88, title: "ルール変更: 追跡者", speaker: "看護師", portrait: "🏃", status: "だるま2", text: "「でも今回は少しだけルールを変えるわ。今度は、あなたが『だるまさんがころんだ』から逃げ切る番よ！」" },
+            { id: 89, title: "アスレチック廊下", speaker: "少女（あなた）", portrait: "🏃‍♀️", status: "挑戦", text: "【アクション: 振り返りを見極めて逃げ切れ！】\n障害物のアスレチックをクリアせよ！看護師が『だるまさんがころんだ』と喋り終わる瞬間に、進む動作を止めなければ即即死ゲームオーバーだ！", interactive: "daruma_athletic" },
+            { id: 90, title: "欺瞞のゴール", speaker: "少女（あなた）", portrait: "🧱", status: "絶望", text: "なんとか障害物を抜けてゴールと思われる扉へたどり着いたが、いくら叩いても開かない！" },
+            { id: 91, title: "罠", speaker: "看護師", portrait: "👹", status: "嘲笑", text: "「ひゃっはっは！騙されたわね！最初からここに出口なんて用意していないのよ！」" },
+            { id: 92, title: "落下する鉄籠", speaker: "少女（あなた）", portrait: "🕸️", status: "捕獲", text: "ガシャン！！\n天井から超高速で頑丈な鉄格子のケージが降ってきた！避ける暇もなく、あなたはその中に完全に閉じ込められてしまった。" },
+            { id: 93, title: "囚人の部屋", speaker: "少女（あなた）", portrait: "⛓️", status: "牢獄", text: "ケージごとクレーンで運ばれた先は、数え切れないほどの檻が吊るされた巨大な暗黒のホールだった。そこには聞き慣れたうめき声が響いていた。" },
+            { id: 94, title: "見知った顔ぶれ", speaker: "海鮮丼", portrait: "🐙", status: "囚人", text: "なんと、隣の檻にはあの「海鮮丼」、そしてかつてあなたを襲ったお面の「梅干しおにぎり」、さらには学校の「先生」までが閉じ込められている！" },
+            { id: 95, title: "美しきエイリアン", speaker: "謎の男", portrait: "🤵", status: "真の黒幕", text: "看護師が近づいてくる。するとその身体がぐにゃりと歪み、まるで宇宙人が姿を現すかのように、イケメンな男性に変貌した。" },
+            { id: 96, title: "捕食の宴", speaker: "謎の男", portrait: "🍽️", status: "捕食", text: "「さぁ…誰から食べようか…？フフフ、とても美味しそうだ」" },
+            { id: 97, title: "順に貪られる命", speaker: "ナレーション", portrait: "🩸", status: "捕食", text: "男はおにぎり梅干し、先生、そして海鮮丼の順で、信じられない顎の力で丸呑みにして喰らっていった！" },
+            { id: 97.1, title: "次はあなたの番", speaker: "謎の男", portrait: "👅", status: "恐怖", text: "男の赤い舌が唇を濡らす。「さて, メインディッシュの君の番だ…」" },
+            { id: 98, title: "正義のサイレン", speaker: "ナレーション", portrait: "🚨", status: "救済", text: "ウーーーーー！\n突如、建物の外から割れんばかりの警察のサイレン音が何重にも響き渡った！警察の包囲網が迫っている！" },
+            { id: 99, title: "同行の強要", speaker: "謎の男", portrait: "👿", status: "脅迫", text: "「くそ、食うのはまた今度にするよ。ついてこい！」\n男は鋭いナイフを突きつけ、脅してきた。ついて行くしかないのか？", interactive: "obey_or_die" },
+            { id: 100, title: "錆びたコンテナ", speaker: "謎 of 男", portrait: "📦", status: "幽閉", text: "男に引きずられて秘密の裏口から連れ出され、コンテナの中に乱暴に押し込められた。ドアが外からロックされる。" },
+            { id: 101, title: "恐怖の輸送揺れ", speaker: "少女（あなた）", portrait: "🤢", status: "船揺れ", text: "ガタゴト！ザザーーッ！\nコンテナが激しく揺れ始める。トラックの凄まじい振動、そしてそれに続いて船のうねるような大揺れが襲う。あなたはひどい船酔いで視界がぐるぐると回り出す。" },
+            { id: 102, title: "気絶", speaker: "少女（あなた）", portrait: "😵", status: "限界", text: "配送車の揺れとコンテナ船での激しい揺れ。限界を超えたあなたは意識を失った…" },
+            { id: 103, title: "狭小な世界", speaker: "少女（あなた）", portrait: "🧳", status: "キャリーケース", text: "次に意識を取り戻した時、四方がクッションのような壁で覆われていた。信じられないほど狭い。ここはキャリーケースの中だ！" },
+            { id: 104, title: "放置された沈黙", speaker: "少女（あなた）", portrait: "🧳", status: "放置", text: "ゴトッ。キャリーケースの動きが止まった。男がケースをどこかに置き去りにしたようだ。" },
+            { id: 105, title: "孤独な時間", speaker: "ナレーション", portrait: "⌛", status: "経過", text: "男は追跡を逃れるため、あなたを置き去りにしたまま逃亡を企てた。" },
+            { id: 106, title: "見知らぬ土地の冷気", speaker: "少女（あなた）", portrait: "🇬🇧", status: "異国", text: "ケースの隙間から、凍えるような冷たい風が入ってくる。話し言葉が全く違う。どうやらここは遠く離れた「イギリス」のようだ。" },
+            { id: 107, title: "極限状態の24時間", speaker: "少女（あなた）", portrait: "🥀", status: "瀕死", text: "ご飯も食べてないし水も飲んでいない。精神的にも肉体的にも完全な限界を迎えていた。" },
+            { id: 108, title: "突然の浮遊感", speaker: "少女（あなた）", portrait: "🧳", status: "移動", text: "その時にキャリーケースが動き始めた。イギリスの歩道はきれいに整備されていて、揺れが極めて少ない。" },
+            { id: 109, title: "安息と悪夢の始まり", speaker: "少女（あなた）", portrait: "😴", status: "睡眠", text: "心地よい揺れに、あなたは安心のあまり寝てしまった。しかし、夢の中でまたあの地獄が繰り返される。" },
+            { id: 110, title: "暗い森のナイフ", speaker: "謎の男", portrait: "🔪", status: "夢", text: "あの男が自分に向かって鋭い包丁を持って近づいてくる…" },
+            { id: 111, title: "夢の破裂", speaker: "謎の男", portrait: "🩸", status: "夢2", text: "そのまま自分は刺されて死んでしまった。全身にすごい汗をかきながら起きた。" },
+            { id: 112, title: "異国の地下室", speaker: "少女（あなた）", portrait: "🛖", status: "目覚め", text: "どうやらここは温かい地下室らしい。" },
+            { id: 113, title: "優しいおじさん", speaker: "優しいおじさん", portrait: "👴", status: "保護", text: "上の階から優しいイギリス人のおじさんが降りてきた。\n「おやおや, 起きたのか？気分はどうだい？君、キャリーケースに入っていたぞ？大丈夫か？」" },
+            { id: 114, title: "翻訳機", speaker: "おじさん", portrait: "📟", status: "対話", text: "おじさんは翻訳機を持ってきて聞いてくれた。「どこの国の人かい？」あなたは「日本人」と答えた。" },
+            { id: 115, title: "イギリスでの新しい日々", speaker: "ナレーション", portrait: "🇬🇧", status: "学習", text: "それから、あなたはイギリスの言葉（英語）を一生懸命に勉強した。" },
+            { id: 116, title: "日系の看板娘", speaker: "カフェの客", portrait: "☕", status: "日常", text: "カフェで働くことになり、カフェのお客様からは「日系看板娘」と呼ばれて愛されるようになった。" },
+            { id: 117, title: "終わらない追跡", speaker: "謎の男", portrait: "🤵", status: "遭遇", text: "そんなある日、あの男がカフェにやってきたのだ！" },
+            { id: 118, title: "絶望の再会", speaker: "少女（あなた）", portrait: "😭", status: "号泣", text: "過去のトラウマを思い出して、あなたはその場にへたり込んで泣き出してしまった。" },
+            { id: 119, title: "一撃の闇", speaker: "謎の男", portrait: "👊", status: "襲撃", text: "「うるさい！」男はそう言ってあなたを激しく殴り、気絶させた。" },
+            { id: 120, title: "勇敢な目撃者たち", speaker: "カフェの従業員", portrait: "👥", status: "追跡", text: "他の従業員たちは物陰に隠れていたが、この誘拐の瞬間をしっかりと見ていた。" },
+            { id: 121, title: "二度目の船旅", speaker: "ナレーション", portrait: "⛴️", status: "気絶", text: "またキャリーケースに入れられて船に乗せられた（あなたは気絶している）。" },
+            { id: 122, title: "吐き気との闘い", speaker: "少女（あなた）", portrait: "🤢", status: "船揺れ", text: "気がついたのは船のコンテナの中。またゆらゆらと揺れる船内で、必死に吐き気を堪える。" },
+            { id: 123, title: "限界の港", speaker: "少女（あなた）", portrait: "🥀", status: "瀕死", text: "ついたときにはほぼ気絶しているのと同じ状態だった。男はまたキャリーケースに入れて運んでいく。" },
+            { id: 124, title: "聞き覚えのある声", speaker: "従業員たち", portrait: "🇬🇧", status: "救出", text: "その時、外から聞き覚えのある声が聞こえてきた！あのカフェの従業員たちだ！" },
+            { id: 125, title: "海を渡った絆", speaker: "ナレーション", portrait: "✈️", status: "追跡", text: "実は従業員たちが、あなたを助けるために遥々日本までついてきていたのだ！" },
+            { id: 126, title: "包囲網", speaker: "警察", portrait: "🚨", status: "逮捕", text: "外からサイレンが聞こえる。男は逃げようとしたが、従業員たちが全力で取り押さえた！" },
+            { id: 127, title: "黒幕の逮捕", speaker: "ナレーション", portrait: "🚓", status: "解決", text: "男はそのまま逮捕された。彼こそが全ての事件の黒幕だったのだ。" },
+            { id: 128, title: "救出とコンビニ", speaker: "従業員一同", portrait: "🏪", status: "平穏", text: "キャリーケースから無事救出され、あなたたちはコンビニへと向かった。" },
+            { id: 129, title: "思い出のおにぎり", speaker: "同僚", portrait: "🍙", status: "感動", text: "従業員のひとりが、あなたがおにぎりだった頃と同じ種類のおおにぎり（ツナマヨ）を買って手渡してくれた。" },
+            { id: 130, title: "涙の味", speaker: "少女（あなた）", portrait: "😭", status: "完結", text: "みんなの目の前で、あなたはおにぎりを泣きそうになりながら、一口一口噛み締めた。" },
+            { id: 131, title: "報道の終幕", speaker: "テレビ番組", portrait: "📺", status: "エピローグ", text: "後日、イギリスのテレビでこの男の逮捕と、一連の事件の全貌が放送された。" },
+            { id: 132, title: "これからの未来", speaker: "少女（あなた）", portrait: "🇬🇧", status: "未来", text: "その後もイギリスのカフェで看板娘として働き続けることにした。今度こそ本当の平和を手に入れて――" },
+            
+            // --- NEW STORY ARC INSERTS (140 - 171) ---
+            { id: 133, title: "旅立ちの決意", speaker: "少女（あなた）", portrait: "✈️", status: "出発", text: "イギリスのカフェの仲間たちに、温かく見送られて私は日本へと戻ることを決意した。\n「みんな、今まで本当にありがとう。私、自分の足で『普通』の未来を歩いてみるね！」" },
+            { id: 134, title: "通常の中学校へ", speaker: "少女（あなた）", portrait: "🏫", status: "転入", text: "私は日本へ戻り、ついに通常の一般の中学校へと正式に編入した。体験入学の時のあの赤い殺人レーザーも、不気味なハッチもない。これこそ私が望んだ本当の学舎だ。" },
+            { id: 135, title: "冷たい現実", speaker: "少女（あなた）", portrait: "🎒", status: "孤立", text: "しかし、学校の生活に少しずつ慣れてきた頃、私の周りで静かに、そして不条理な変化が始まった。クラスの一部のグループが、私を避けるような冷たい視線を向け始めたのだ。" },
+            { id: 136, title: "陰湿ないじめの始まり", speaker: "少女（あなた）", portrait: "🥀", status: "いじめ", text: "毎日、登校すると私の机には酷い「落書き」がされ、上履きや教科書が隠されるようになった。前世であれほどの恐怖に耐えてきた私なのに、どうしてこんなにも胸が痛むのだろう。" },
+            { id: 137, title: "校舎裏での暴力", speaker: "いじめっ子たち", portrait: "👊", status: "暴力", text: "【演出: 痛みに耐えろ！】\n放課後、校舎裏に呼び出された私は、複数のいじめっ子たちに囲まれ、地面に突き倒された。何度も殴られ、蹴られ、全身に痛みが走る。私はただ丸くなって嵐が過ぎ去るのを待つしかなかった…", interactive: "dodge_plum" },
+            { id: 138, title: "芽生えた恋心", speaker: "少女（あなた）", portrait: "💖", status: "恋心", text: "そんな地獄のような日々の中、私の心は完全に「女の子」としての感情で満たされていた。そして、クラスで唯一、私を他の誰とも同じように普通に、優しく接してくれる『彼』のことが好きになった。" },
+            { id: 139, title: "切り裂かれる心の距離", speaker: "いじめっ子たち", portrait: "🤬", status: "妨害", text: "「おいおい、あいつ調子に乗ってイケメンに近づこうとしてるよ、キモ！」\nいじめっ子たちは私たちの噂を流し、強引に彼と私を遠ざけようと卑劣な嫌がらせを加速させていった。" },
+            { id: 140, title: "告白", speaker: "彼氏", portrait: "👦", status: "告白", text: "「やっぱり、私みたいな存在には彼との未来なんて無理なのかな…」と屋上で諦めかけていたその時、突然彼が私の手を握りしめ、まっすぐな瞳で見つめてきた。\n「俺、ずっとお前が好きだったんだ。付き合ってほしい」" },
+            { id: 141, title: "デートの約束", speaker: "少女（あなた）", portrait: "📱", status: "歓喜", text: "「はい…！私も、私もずっと好きでした！」\n私たちは涙を流しながら抱き合い、次の週末に初めてのデートをショッピングモールでする約束を交わした。これ以上の幸せはなかった。" },
+            { id: 142, title: "待ちに待った当日", speaker: "少女（あなた）", portrait: "👗", status: "デート", text: "日曜日。お気に入りの服を着て、私は約束のショッピングモールの広場に少し早めに着いて彼を待っていた。胸が激しく高鳴る。" },
+            { id: 143, title: "不審な研究者", speaker: "変なおじさん", portrait: "👓", status: "接近", text: "その時、白衣を羽織り、分厚いメガネをかけた不気味な男が早足でこちらに近づいてきた。まるで何かを熱心に研究する学者のような異様な風貌をしている。" },
+            { id: 144, title: "第二の拉致", speaker: "研究員のおじさん", portrait: "🕸️", status: "拉致", text: "「お前が新たな被験体か。フフ、実に素晴らしい遺伝子だ！」\n瞬間、視界が真っ暗になった！私は背後から巨大な麻袋を被せられ、無理やり車へと押し込まれた！" },
+            { id: 145, title: "必死の追跡", speaker: "彼氏", portrait: "🚲", status: "猛追", text: "「おい！何をするんだ、放せ！！」\n待ち合わせ場所に向かっていた彼氏が、その連れ去られる瞬間を目撃した！彼は自転車に飛び乗り、私を乗せた拉致車両を必死の形相でペダルを漕いで追いかけてきている！" },
+            { id: 146, title: "冷たい実験室", speaker: "研究員のおじさん", portrait: "🧪", status: "研究室", text: "連れて行かれた先は、怪しいフラスコや精密機器が並ぶ、白く冷徹な地下研究室だった。私は頑丈な拘束椅子に縛り付けられた。" },
+            { id: 147, title: "怪しい注射", speaker: "研究員のおじさん", portrait: "💉", status: "注射", text: "【アクション: 毒性の注射を打たれていく…！】\n「さあ、実験を始めよう。この新しい脳活性化ドラッグを投与する。副作用がどう出るか楽しみだな！」\n太い注射器の針が、私の腕に深く突き刺された！", interactive: "burn_lock" },
+            { id: 148, title: "蝕まれる意識", speaker: "少女（あなた）", portrait: "🌀", status: "混濁", text: "「う、ううっ…身体が熱い…」\n注射された直後は何事もなかったが、数秒経つと脳の奥が焼け付くように痛み、意識がみるみる濁り始めた。立っていられない。" },
+            { id: 149, title: "催眠の支配", speaker: "少女（あなた）", portrait: "👾", status: "催眠", text: "「私は…偉大なる研究者の…下僕…」\n薬の効果により身体の自由が完全に奪われ、私は自分の意思とは無関係に、奇妙な言葉をブツブツと喋り、操り人形のように不気味に踊り始めてしまった。" },
+            { id: 150, title: "ヒーローの乱入", speaker: "彼氏", portrait: "👦", status: "救出", text: "バガァン！！\n実験室の重いセキュリティ扉を体当たりで叩き破り、彼氏が乱入してきた！息を切らし、傷だらけになりながら、彼は私を見つけ出して叫んだ。「今助ける！」" },
+            { id: 151, title: "お姫様抱っこの逃走劇", speaker: "彼氏", portrait: "🏃", status: "脱出", text: "「こいつら、被験体を奪い返せ！」\n迫る追手たちの拳をくぐり抜け、彼は私を力強く「お姫様抱っこ」で抱え上げると、全力で迷路のような研究室の廊下を駆け抜けた！" },
+            { id: 152, title: "もがく身体", speaker: "少女（あなた）", portrait: "😵", status: "混濁2", text: "抱きかかえられながらも、私の催眠状態は解けていない。身体が勝手に暴れ、彼の胸を何度も叩いて抵抗してしまう。「う、うわあ！放して、放して！」" },
+            { id: 153, title: "夜を越えて", speaker: "彼氏", portrait: "🏠", status: "看病", text: "彼は必死に私を自宅まで連れ帰り、一晩中私の手を握って熱を出し暴れる私を看病し続けてくれた。そして翌朝、ようやく頭の靄が晴れ、私の催眠状態は完全に消失した。" },
+            { id: 154, title: "いじめっ子たちの降伏", speaker: "いじめっ子たち", portrait: "😒", status: "諦め", text: "翌日、私と彼がしっかりと手を繋いで登校する姿、そして彼が私を命がけで守ったという事実を知ったいじめっ子たちは、ついに戦意を喪失した。「…あいつらの絆、もうどうやっても壊せないわね」彼らは諦めて去っていった。" },
+            { id: 155, title: "見えざる時限爆弾", speaker: "少女（あなた）", portrait: "🩺", status: "不安", text: "平穏を取り戻した学校生活。しかし、私はまだ知らなかった。あのおじさんに打たれた「怪しい注射」の、真に恐るべき恐ろしい副作用が、私の身体を蝕み始めていることを。" },
+            { id: 156, title: "日常の歩み", speaker: "少女（あなた）", portrait: "🏫", status: "平穏", text: "それから数日間、私たちは普通の恋人同士として、放課後に一緒に帰り、他愛のない話をしながら歩くごく当たり前の生活を送っていた。幸せだった。" },
+            { id: 157, title: "突発の暗闇", speaker: "少女（あなた）", portrait: "🌑", status: "異変", text: "ある日の昼下がり、学校の廊下を彼と一緒に笑いながら歩いていたその瞬間。突然、目の前がシャッターを下ろしたかのように真っ暗になり、音すら聞こえなくなった。身体から一気に力が抜けていく。" },
+            { id: 158, title: "崩れ落ちた身体", speaker: "ナレーション", portrait: "🩺", status: "転倒", text: "「おい！しっかりしろ！おい！！」\n廊下に倒れ込んだ私を、彼は必死に揺さぶる。しかし、私の意識は奈落の底へと引きずり込まれ、返事をすることはできなかった。" },
+            { id: 159, title: "救急車の中で", speaker: "救急隊員", portrait: "🚑", status: "搬送", text: "ピーポーピーポー…\nサイレンが遠くで響く。気がつくと私は搬送される救急車の中にいた。だが、部外者である彼は、同乗を許されず、引き裂かれるようにその場に残されてしまった。" },
+            { id: 160, title: "非情の診断: 脳梗塞", speaker: "医師", portrait: "🩺", status: "告知", text: "「検査の結果、脳の微細血管が薬物毒性により閉塞しています…『脳梗塞』です。即座に絶対安静の集中治療入院が必要となります」\n医師の言葉は重く冷たかった。" },
+            { id: 161, title: "悲報の電話", speaker: "彼氏", portrait: "📞", status: "電話", text: "病院の公衆電話から、彼は私の診断結果を聞いた。受話器を持つ彼の手が激しく震える。「脳梗塞…？そんなの嘘だろ…！？今すぐ行く、待ってろ！」" },
+            { id: 162, title: "病院へ急ぐペダル", speaker: "彼氏", portrait: "🚲", status: "追走", text: "彼は自転車に飛び乗り、立ち上がるように立ち漕ぎで、全力で病院へとペダルを回した。私の元へ一秒でも早く駆けつけるために、彼の額に大粒の汗が滲む。" },
+            { id: 163, title: "凶刃のスピード", speaker: "ナレーション", portrait: "🚗", status: "事故", text: "キキーーーーッ！！\n彼が病院手前の交差点を通過しようとしたその時、赤信号を無視したトラックが、凄まじいスピードで彼の横から突っ込んできた！" },
+            { id: 164, title: "永遠の離別", speaker: "ナレーション", portrait: "🪦", status: "死", text: "ドンッ！！\n大きな衝撃音とともに、彼の身体は宙を舞い、アスファルトへ叩きつけられた。自転車は無残に拉げ、彼は私を守り抜いたその尊い命を、ここで落としてしまった…" },
+            { id: 165, title: "静かな覚醒", speaker: "少女（あなた）", portrait: "🏥", status: "闘病", text: "数日後、最先端の治療により、私の脳梗塞の症状は奇跡的に回復の兆しを見せた。しかし、私の心にはポッカリと穴が空いたような、冷たい寂しさが充満していた。" },
+            { id: 166, title: "新たな侵食", speaker: "医師", portrait: "🩺", status: "絶望", text: "「脳の梗塞は消えましたが…実験の薬剤による全身の臓器不全が、別の新たな不治の病となって進行しています。もはや現代医学では…」\n医師は静かに首を振った。" },
+            { id: 167, title: "目を閉じて", speaker: "少女（あなた）", portrait: "🕯️", status: "終幕", text: "私は彼のいない白い天井を見つめ、静かに呼吸を整えた。私の短く、あまりにも波瀾万丈だった人生。でも彼に愛されたあの瞬間は、確かに本物だった。\n「待っててね…今行くから…」\n私は微笑むように、ゆっくりと、永遠に目を閉じた――" },
+
+            // --- CREDITS ARCS (168 - 173) ---
+            { id: 168, title: "エンドロール開始", speaker: "システム", portrait: "🎬", status: "終了", text: "物語は哀しくも、美しい結末を迎えました。画面をタップすると、最後のエンドロールが開始されます。" },
+            { id: 169, title: "エピローグ: 旅の回想", speaker: "atsugiri", portrait: "📝", status: "製作者", text: "【物語の振り返り】\nおにぎりへの改造、恐怖の洗脳工場、親子丼の絶望、そして少女への転生。中学生の殺人レーザー廊下、水中での気絶、イギリスへのキャリーケース漂流、そして男の逮捕。" },
+            { id: 170, title: "エピローグ: 最後の恋", speaker: "atsugiri", portrait: "📝", status: "製作者", text: "【物語の振り返り2】\n通常の中学校でのいじめ、彼氏との運命的な出会い。変なおじさんによる拉致実験、彼氏の必死な救出とお姫様抱っこ。脳梗塞、そして二人に訪れた不条理な最期。" },
+            { id: 171, title: "スタッフクレジット1", speaker: "制作", portrait: "🎨", status: "クレジット", text: "【ゲームデザイン＆プロデュース】\n　制作 : atsugiri" },
+            { id: 172, title: "スタッフクレジット2", speaker: "コーディング", portrait: "💻", status: "クレジット", text: "【コーディング】\n　Gemini (Google Built AI)" },
+            { id: 173, title: "THE END", speaker: "システム", portrait: "🎉", status: "完結", text: "おにぎり製造工場 〜謎の男〜\nこれにて完全閉幕。最後までプレイしていただき、誠にありがとうございました。" }
+        ];
+
+        // --- STATE MANAGEMENT ---
+        let currentStepIndex = 0; 
+        const SAVE_KEY = "onigiri_factory_save_v4";
+        
+        // --- THREE.JS SYSTEM VARIABLES ---
+        let scene, camera, renderer, animationFrameId;
+        let ambientLight, directionalLight, pointLight;
+        let mazeWall, playerMesh, enemyMesh, particles;
+
+        // --- PUZZLE SPECIFIC STATES ---
+        let collectedCount = 0;
+        const TARGET_COLLECT = 3;
+        let activeItems = [];
+        let itemSpawningInterval = null;
+
+        // Slide Puzzle Board state
+        let slideBoard = [1, 2, 3, 4, 5, 6, 7, 8, 0]; // 0 is the empty slot. Resolved form.
+        let puzzleSolved = false;
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            loadGameProgress();
+            init3D();
+            updateUI();
+            showSaveIndicator();
+        };
+
+        // --- FULLSCREEN CONTROLLER ---
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log("Error attempting to enable full-screen mode:", err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // --- STORAGE CONTROLLERS ---
+        function saveGameProgress() {
+            localStorage.setItem(SAVE_KEY, JSON.stringify({
+                stepIndex: currentStepIndex
+            }));
+            showSaveIndicator();
+        }
+
+        function loadGameProgress() {
+            const saved = localStorage.getItem(SAVE_KEY);
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (typeof parsed.stepIndex === 'number' && parsed.stepIndex < gameStory.length) {
+                        currentStepIndex = parsed.stepIndex;
+                    }
+                } catch(e) {
+                    console.error("Save load failed:", e);
+                }
+            }
+        }
+
+        function resetGameSave() {
+            if (confirm("データを消去して最初からやり直しますか？")) {
+                currentStepIndex = 0;
+                saveGameProgress();
+                updateUI();
+                init3D();
+            }
+        }
+
+        function showSaveIndicator() {
+            const indicator = document.getElementById("save-status");
+            indicator.style.opacity = "1";
+            setTimeout(() => {
+                indicator.style.opacity = "0";
+            }, 2000);
+        }
+
+        // --- STEP NAVIGATION ---
+        function nextStep() {
+            const activeStep = gameStory[currentStepIndex];
+            if (activeStep.interactive) {
+                alertBox("このイベントをクリアしないと先へ進めません！");
+                return;
+            }
+            if (currentStepIndex < gameStory.length - 1) {
+                currentStepIndex++;
+                saveGameProgress();
+                updateUI();
+                trigger3DTransition();
+            }
+        }
+
+        // Screen shake animation trigger
+        function shakeScreen() {
+            document.body.classList.add("shake-active");
+            setTimeout(() => {
+                document.body.classList.remove("shake-active");
+            }, 400);
+        }
+
+        function previousStep() {
+            if (currentStepIndex > 0) {
+                currentStepIndex--;
+                saveGameProgress();
+                updateUI();
+                trigger3DTransition();
+            }
+        }
+
+        // Force transition from game scripts
+        function forceNextStep() {
+            if (currentStepIndex < gameStory.length - 1) {
+                currentStepIndex++;
+                saveGameProgress();
+                updateUI();
+                trigger3DTransition();
+            }
+        }
+
+        // --- UI DRAW ---
+        function updateUI() {
+            const activeStep = gameStory[currentStepIndex];
+            
+            // Text values
+            document.getElementById("stage-title").innerText = `EPISODE ${Math.floor(activeStep.id / 10) + 1}: ${activeStep.title}`;
+            document.getElementById("speaker-name").innerText = activeStep.speaker;
+            document.getElementById("char-portrait").innerText = activeStep.portrait;
+            document.getElementById("char-status").innerText = activeStep.status;
+            document.getElementById("dialogue-text").innerText = activeStep.text;
+            document.getElementById("progress-indicator").innerText = activeStep.id;
+
+            // Clean interval of item gather when not on that step
+            if (activeStep.interactive !== "collect_ingredients") {
+                if (itemSpawningInterval) {
+                    clearInterval(itemSpawningInterval);
+                    itemSpawningInterval = null;
+                }
+            }
+
+            // Nav buttons
+            const backBtn = document.getElementById("btn-back");
+            const nextBtn = document.getElementById("btn-next");
+            
+            if (currentStepIndex > 0) {
+                backBtn.classList.remove("hidden");
+            } else {
+                backBtn.classList.add("hidden");
+            }
+
+            if (activeStep.interactive) {
+                nextBtn.classList.add("hidden");
+            } else {
+                nextBtn.classList.remove("hidden");
+                nextBtn.innerHTML = `進む <i class="fa-solid fa-chevron-right"></i>`;
+            }
+
+            const overlay = document.getElementById("scary-overlay");
+            const dialogueBox = document.getElementById("dialogue-box");
+            const stageIndicator = document.getElementById("game-stage-indicator");
+            const pulsingDot = document.getElementById("pulsing-dot");
+            
+            // Standard dark steel theme setup
+            document.body.style.backgroundColor = "#0c0c0e";
+            dialogueBox.className = "bg-zinc-900/95 border-2 border-zinc-800 rounded-xl p-4 md:p-5 flex flex-col justify-between shadow-2xl transition-all duration-300 relative pointer-events-auto w-full";
+            stageIndicator.className = "bg-zinc-950/95 border border-zinc-700/60 text-zinc-300 px-4 py-2 rounded-lg text-xs font-mono flex items-center gap-2.5 shadow-xl shadow-black/80";
+            pulsingDot.className = "w-2.5 h-2.5 rounded-full bg-zinc-400 animate-pulse";
+            overlay.style.opacity = "0.45";
+
+            // Exception: United Kingdom Scene (Light soft slate theme)
+            if (activeStep.id >= 115 && activeStep.id <= 122) {
+                document.body.style.backgroundColor = "#e2e8f0";
+                dialogueBox.className = "bg-slate-50/95 border-2 border-slate-300 rounded-xl p-4 md:p-5 flex flex-col justify-between shadow-2xl transition-all duration-300 relative pointer-events-auto w-full text-slate-900";
+                document.getElementById("dialogue-text").className = "text-sm md:text-base leading-relaxed text-slate-800 font-medium whitespace-pre-line";
+                stageIndicator.className = "bg-slate-100 border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-mono flex items-center gap-2.5 shadow-md";
+                pulsingDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                overlay.style.opacity = "0.05";
+            } else if (activeStep.id >= 133 && activeStep.id <= 167) {
+                // School / Romantic Tragedy Arc - Cold Clean Neutral Gray Theme
+                document.body.style.backgroundColor = "#1c1d21";
+                dialogueBox.className = "bg-zinc-900/95 border-2 border-zinc-700 rounded-xl p-4 md:p-5 flex flex-col justify-between shadow-2xl transition-all duration-300 relative pointer-events-auto w-full text-zinc-100";
+                document.getElementById("dialogue-text").className = "text-sm md:text-base leading-relaxed text-zinc-100 font-medium whitespace-pre-line";
+                stageIndicator.className = "bg-zinc-800 border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs font-mono flex items-center gap-2.5 shadow-md";
+                pulsingDot.className = "w-2.5 h-2.5 rounded-full bg-zinc-400 animate-pulse";
+                overlay.style.opacity = "0.15";
+            } else {
+                document.getElementById("dialogue-text").className = "text-sm md:text-base leading-relaxed text-zinc-100 font-medium whitespace-pre-line";
+            }
+
+            // Handle Dynamic Interactive Panel
+            const interactionPanel = document.getElementById("interaction-panel");
+            if (activeStep.interactive) {
+                interactionPanel.classList.remove("hidden");
+                interactionPanel.className = "block bg-zinc-950/95 border-2 border-zinc-700 rounded-xl p-5 shadow-2xl text-center pointer-events-auto w-full mb-2";
+                interactionPanel.innerHTML = "";
+                setupInteractiveGame(activeStep.interactive, interactionPanel);
+            } else {
+                interactionPanel.classList.add("hidden");
+            }
+
+            // Inventory update
+            const invDisplay = document.getElementById("inventory-display");
+            invDisplay.innerHTML = "";
+            let carried = [];
+            if (currentStepIndex >= 12 && currentStepIndex < 42) carried.push({name: "ライター", icon: "🔥"});
+            if (currentStepIndex >= 35 && currentStepIndex < 43) carried.push({name: "施設内地図", icon: "🗺️"});
+            if (currentStepIndex >= 40 && currentStepIndex < 41) carried.push({name: "調合素材", icon: "🧪"});
+            
+            carried.forEach(item => {
+                invDisplay.innerHTML += `
+                    <span class="bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1 rounded-md flex items-center gap-1.5 font-semibold text-[10px] shadow-sm">
+                        <span>${item.icon}</span> ${item.name}
+                    </span>
+                `;
+            });
+        }
+
+        // --- INTERACTIVE MINI GAMES ENGINE ---
+        function setupInteractiveGame(type, container) {
+            switch(type) {
+                case "navigate_duct_1":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2 uppercase tracking-wider">通気口くねくね迷宮</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">暗く不気味な迷路。正しい方向を瞬時に判断して進み、天むすおにぎりの元へ到達せよ！</p>
+                        <div class="flex justify-center gap-3">
+                            <button onclick="navigateDuct('left')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 px-5 py-2.5 rounded-lg text-xs transition font-bold shadow-md">
+                                <i class="fa-solid fa-turn-up -rotate-90 mr-1"></i> 左通路へ進む
+                            </button>
+                            <button onclick="navigateDuct('right')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 px-5 py-2.5 rounded-lg text-xs transition font-bold shadow-md">
+                                右通路へ進む <i class="fa-solid fa-turn-up rotate-90 ml-1"></i>
+                            </button>
+                        </div>
+                    `;
+                    break;
+                case "choose_path_1":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2 uppercase tracking-wider">分岐選択</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">目の前には不気味な3つの道がある。どれを選択する？</p>
+                        <div class="flex flex-col sm:flex-row justify-center gap-3">
+                            <button onclick="triggerSpecificStep(11)" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs transition font-semibold">左: 陥没地帯</button>
+                            <button onclick="triggerSpecificStep(12)" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-500 text-zinc-100 px-4 py-2 rounded-lg text-xs transition font-bold shadow-md">真ん中: 扉（校長室）</button>
+                            <button onclick="triggerSpecificStep(13)" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-xs transition font-semibold">右: 鉄柵の通路</button>
+                        </div>
+                    `;
+                    break;
+                case "jump_abyss":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2 uppercase tracking-wider">タイミングジャンプ</div>
+                        <p class="text-sm text-zinc-300 mb-3 font-medium">陥没した大穴。インジケーターが<span class="text-zinc-100 font-bold underline">中央の白い安全ゾーン（40%〜60%）</span>にある瞬間にJUMPを押せ！</p>
+                        <div class="w-full bg-zinc-850 h-4 rounded-full overflow-hidden mb-4 relative border border-zinc-700 shadow-inner">
+                            <div class="bg-zinc-600 h-full w-[20%] absolute left-1/2 -translate-x-1/2 rounded"></div>
+                            <div id="jump-indicator" class="bg-white h-full w-[6px] absolute left-0 shadow-[0_0_8px_#fff]"></div>
+                        </div>
+                        <button onclick="attemptJump()" class="bg-zinc-100 hover:bg-zinc-200 text-zinc-950 font-black px-8 py-3 rounded-lg text-xs transition shadow-lg shadow-black/80">
+                            <i class="fa-solid fa-person-running mr-1"></i> JUMP !!
+                        </button>
+                    `;
+                    let direction = 1;
+                    let leftPercent = 0;
+                    const interval = setInterval(() => {
+                        const ind = document.getElementById("jump-indicator");
+                        if (!ind) { clearInterval(interval); return; }
+                        leftPercent += 4 * direction;
+                        if (leftPercent >= 98) { direction = -1; }
+                        if (leftPercent <= 0) { direction = 1; }
+                        ind.style.left = leftPercent + "%";
+                    }, 35);
+                    break;
+                case "burn_lock":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">ロック解除</div>
+                        <p class="text-sm text-zinc-300 mb-3 font-medium">ゴム製の二重ロックだ。ライターで焼き切るためボタンを急いで連打しろ！</p>
+                        <div class="w-full bg-zinc-900 h-4 rounded-full overflow-hidden mb-4 border border-zinc-800 shadow-inner">
+                            <div id="burn-progress" class="bg-gradient-to-r from-zinc-600 to-zinc-400 h-full w-0 transition-all duration-100 shadow-[0_0_8px_#fff]"></div>
+                        </div>
+                        <button onclick="heatUpLock()" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 font-black px-6 py-2.5 rounded-lg text-xs transition">
+                            🔥 ライターで加熱！ (連打)
+                        </button>
+                    `;
+                    break;
+                case "memory_game_hack":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">強制バグ誘発</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">このゲーム盤は細工されている！不規則に高速移動する『⚠️ボタン』をなんとか押し込んで物理破壊しろ！</p>
+                        <div class="h-32 bg-zinc-900/60 rounded-lg border border-zinc-850 relative overflow-hidden mb-3">
+                            <button id="sneaky-warning-btn" onclick="hackMemoryGame()" class="absolute bg-zinc-100 hover:bg-white text-zinc-950 font-black text-[10px] py-1 px-2.5 rounded-md shadow-lg transition-transform cursor-pointer pointer-events-auto" style="top: 40px; left: 45%;">
+                                ⚠️ 警告・強制解除ボタン
+                            </button>
+                        </div>
+                    `;
+                    let angle = 0;
+                    const bInterval = setInterval(() => {
+                        const btn = document.getElementById("sneaky-warning-btn");
+                        if (!btn) { clearInterval(bInterval); return; }
+                        angle += 0.15;
+                        btn.style.left = `${50 + Math.sin(angle) * 35}%`;
+                        btn.style.top = `${40 + Math.cos(angle * 1.8) * 30}%`;
+                    }, 40);
+                    break;
+                case "break_bridge":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">吊り橋の解体</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">後ろから恐ろしい昆布おにぎりが迫る！橋の主柱ロープの結合ボルトを全力で叩き落とせ！</p>
+                        <button onclick="sliceRope()" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-500 text-zinc-100 font-bold py-3.5 px-8 rounded-xl text-xs transition shadow-lg">
+                            🪓 留め具を全力で破壊！
+                        </button>
+                    `;
+                    break;
+                case "dodge_plum":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">緊急回避</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">突撃が仕掛けられた！衝突する前に瞬時に回避動作をとれ！</p>
+                        <div class="flex justify-center gap-3">
+                            <button onclick="dodgeSuccess('左')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 px-6 py-3 rounded-lg text-xs font-bold">
+                                <i class="fa-solid fa-arrow-left mr-1.5"></i> 左に避ける
+                            </button>
+                            <button onclick="dodgeSuccess('右')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 px-6 py-3 rounded-lg text-xs font-bold">
+                                右に避ける <i class="fa-solid fa-arrow-right ml-1.5"></i>
+                            </button>
+                        </div>
+                    `;
+                    break;
+                case "collect_ingredients":
+                    // ADVANCED GATHERING SYSTEM: Falling/floating items timed clicking avoidance game
+                    collectedCount = 0;
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-1 uppercase tracking-wider">素材高速採集ハザード</div>
+                        <p class="text-xs text-zinc-400 mb-2 font-medium">
+                            飛んでくる <span class="text-zinc-100 font-bold">調合用アイテム (🧪, 🌼, ❄️)</span> だけをタップしろ！
+                            障害物 (<span class="text-red-500 font-bold">🔧, 🪵</span>) をタップすると、集めた数が初期化されるぞ！
+                        </p>
+                        <div class="text-xs font-mono font-bold mb-3 text-zinc-300">
+                            獲得状況: <span id="gathered-indicator" class="text-zinc-100 text-sm">0</span> / ${TARGET_COLLECT}
+                        </div>
+                        <div id="gather-screen" class="relative w-full h-48 bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden">
+                            <!-- Items dynamically spawns inside here -->
+                        </div>
+                    `;
+                    startItemGatherGame();
+                    break;
+                case "sacrifice_or_not":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">支配者の命令</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">海鮮丼様が冷たい視線でこちらを睨みつけている。引き伸ばせば自ら襲いかかってくる！</p>
+                        <div class="flex justify-center gap-3">
+                            <button onclick="sacrificeAction('refuse')" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 py-2.5 px-4 rounded-lg text-xs font-semibold">拒絶する（怒りゲージ上昇）</button>
+                            <button onclick="sacrificeAction('obey')" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-500 text-zinc-100 py-2.5 px-4 rounded-lg text-xs font-bold">指示に従っておにぎりを選ぶ</button>
+                        </div>
+                    `;
+                    break;
+                case "insert_battery":
+                    // 3x3 SLIDING CIRCUIT BOARD PUZZLE - LEVEL EASY
+                    puzzleSolved = false;
+                    initSlidePuzzle(3); // 3 shuffles
+                    drawSlidePuzzle(container, "NORMAL");
+                    break;
+                case "insert_battery_hard":
+                    // 3x3 SLIDING CIRCUIT BOARD PUZZLE - LEVEL HARD
+                    puzzleSolved = false;
+                    initSlidePuzzle(25); // 25 shuffles - complex
+                    drawSlidePuzzle(container, "HARD");
+                    break;
+                case "laser_run":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">安全スキャン</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium"><span class="text-emerald-400 font-bold">緑の「安全」ランプ</span>がついた瞬間のみダッシュボタンを押して切り抜けろ！赤の時に動くと即やり直し！</p>
+                        <div id="laser-status" class="w-20 h-20 rounded-full mx-auto bg-zinc-800 border-2 border-zinc-600 flex items-center justify-center text-zinc-400 font-extrabold text-xs mb-4">
+                            監視中
+                        </div>
+                        <button onclick="dashLaser()" class="bg-zinc-100 hover:bg-white text-zinc-950 font-black py-3 px-6 rounded-lg text-xs shadow-md transition w-full max-w-[200px]">
+                            全力ダッシュ！
+                        </button>
+                    `;
+                    let isGreen = false;
+                    const laserInt = setInterval(() => {
+                        const status = document.getElementById("laser-status");
+                        if (!status) { clearInterval(laserInt); return; }
+                        isGreen = !isGreen;
+                        if (isGreen) {
+                            status.className = "w-20 h-20 rounded-full mx-auto bg-zinc-200 text-zinc-900 border-2 border-white flex items-center justify-center font-black text-xs mb-4 shadow-[0_0_15px_#fff]";
+                            status.innerText = "安全 (走れ！)";
+                        } else {
+                            status.className = "w-20 h-20 rounded-full mx-auto bg-zinc-900 text-zinc-500 border-2 border-zinc-700 flex items-center justify-center font-bold text-xs mb-4";
+                            status.innerText = "危険 (止まれ！)";
+                        }
+                    }, 1800);
+                    break;
+                case "daruma_athletic":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">だるまさんがころんだ</div>
+                        <p class="text-sm text-zinc-300 mb-3 font-medium">看護師が「だるまさんがころんだ」と言っていない間だけ、一歩進むことができる。言い終わる瞬間に動いたら即、独房送りだ！</p>
+                        <div id="daruma-voice" class="text-zinc-400 font-bold text-sm mb-3">だ・る・ま・さ・ん・が…</div>
+                        <div class="w-full bg-zinc-900 h-2 rounded-full overflow-hidden mb-4 border border-zinc-800">
+                            <div id="daruma-p" class="bg-zinc-400 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                        <button onclick="stepDaruma()" class="bg-zinc-100 hover:bg-white text-zinc-950 font-black py-3 px-6 rounded-lg text-xs shadow-md transition">
+                            一歩進む
+                        </button>
+                    `;
+                    const phrases = [
+                        "だ・る・ま・さ・ん・が…",
+                        "こ・ろ・ん・だ！",
+                        "……",
+                        "だ・る・ま・さ・ん・が・こ・ろ・ん・だ！"
+                    ];
+                    let phraseIdx = 0;
+                    const dInt = setInterval(() => {
+                        const voice = document.getElementById("daruma-voice");
+                        if (!voice) { clearInterval(dInt); return; }
+                        phraseIdx = (phraseIdx + 1) % phrases.length;
+                        voice.innerText = phrases[phraseIdx];
+                        if (phrases[phraseIdx].includes("だ！")) {
+                            voice.className = "text-zinc-100 font-black text-base animate-pulse glow-zinc";
+                        } else {
+                            voice.className = "text-zinc-400 font-bold text-sm";
+                        }
+                    }, 1400);
+                    break;
+                case "obey_or_die":
+                    container.innerHTML = `
+                        <div class="text-xs text-zinc-400 font-mono mb-2">運命の決断</div>
+                        <p class="text-sm text-zinc-300 mb-4 font-medium">男が凶暴な眼差しで同行を要求している。拒絶すればこの場で抹殺されるだろう。</p>
+                        <div class="flex justify-center gap-3">
+                            <button onclick="obeyDecision(true)" class="bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-100 py-3 px-5 rounded-lg text-xs font-bold transition">大人しく従う</button>
+                            <button onclick="obeyDecision(false)" class="bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 text-zinc-500 py-3 px-5 rounded-lg text-xs font-medium transition">反抗する</button>
+                        </div>
+                    `;
+                    break;
+            }
+        }
+
+        // --- GATHERING MINI-GAME ENGINE (HIGH DIFFICULTY) ---
+        function startItemGatherGame() {
+            const screen = document.getElementById("gather-screen");
+            if (!screen) return;
+            activeItems = [];
+
+            // Spawn an object every 800ms
+            itemSpawningInterval = setInterval(() => {
+                const screen = document.getElementById("gather-screen");
+                if (!screen) {
+                    clearInterval(itemSpawningInterval);
+                    return;
+                }
+                
+                // Decide type
+                const rand = Math.random();
+                let itemType = 'obstacle'; // Default obstacle
+                let emoji = '🔧';
+                
+                if (rand < 0.4) {
+                    // Valid items
+                    const items = [
+                        { emoji: '🧪', name: 'ヨウ素液' },
+                        { emoji: '🌼', name: 'たんぽぽ' },
+                        { emoji: '❄️', name: '液体窒素' }
+                    ];
+                    const selected = items[Math.floor(Math.random() * items.length)];
+                    itemType = 'valid';
+                    emoji = selected.emoji;
+                } else {
+                    // Obstacles
+                    emoji = Math.random() < 0.5 ? '🔧' : '🪵';
+                }
+
+                // Create element
+                const element = document.createElement("div");
+                element.className = "absolute text-2xl cursor-pointer select-none transition-all duration-100 hover:scale-125 z-40";
+                element.innerText = emoji;
+                
+                // Random spawn positions
+                const startX = Math.random() * (screen.clientWidth - 30);
+                const startY = Math.random() * (screen.clientHeight - 30);
+                element.style.left = startX + "px";
+                element.style.top = startY + "px";
+
+                // High speed directional drift variables
+                let vx = (Math.random() - 0.5) * 6;
+                let vy = (Math.random() - 0.5) * 6;
+
+                // Collision event handler
+                element.onclick = (e) => {
+                    e.stopPropagation();
+                    if (itemType === 'valid') {
+                        collectedCount++;
+                        document.getElementById("gathered-indicator").innerText = collectedCount;
+                        alertBox(`ナイス！ ${emoji} を獲得した！`);
+                        element.remove();
+                        
+                        if (collectedCount >= TARGET_COLLECT) {
+                            clearInterval(itemSpawningInterval);
+                            alertBox("完璧だ！調合に必要な全ての材料を手に入れた！");
+                            setTimeout(() => {
+                                forceNextStep();
+                            }, 800);
+                        }
+                    } else {
+                        // Clicked obstacle! Reset!
+                        collectedCount = 0;
+                        document.getElementById("gathered-indicator").innerText = collectedCount;
+                        shakeScreen();
+                        alertBox("痛い！障害物に触れてしまい、集めていた材料が散らばってしまった！");
+                        element.remove();
+                    }
+                };
+
+                screen.appendChild(element);
+
+                // Simple frame based physics loop for bounce
+                let age = 0;
+                const physicsInt = setInterval(() => {
+                    if (!element.parentNode) {
+                        clearInterval(physicsInt);
+                        return;
+                    }
+                    
+                    let currLeft = parseFloat(element.style.left) || 0;
+                    let currTop = parseFloat(element.style.top) || 0;
+
+                    // Update positions
+                    currLeft += vx;
+                    currTop += vy;
+
+                    // Walls bounce logic
+                    if (currLeft <= 0 || currLeft >= screen.clientWidth - 30) vx *= -1;
+                    if (currTop <= 0 || currTop >= screen.clientHeight - 30) vy *= -1;
+
+                    element.style.left = currLeft + "px";
+                    element.style.top = currTop + "px";
+
+                    age += 1;
+                    if (age > 100) { // Disappear after a few seconds
+                        element.remove();
+                        clearInterval(physicsInt);
+                    }
+                }, 30);
+
+            }, 750);
+        }
+
+        // --- SLIDE CIRCUIT PUZZLE ENGINE (3x3 GRID) ---
+        function initSlidePuzzle(shuffles) {
+            slideBoard = [1, 2, 3, 4, 5, 6, 7, 8, 0]; // 0 is empty slot
+            
+            // Randomly shuffle using actual sliding rules to guarantee solvability
+            for (let i = 0; i < shuffles; i++) {
+                const moves = getValidMoves();
+                const randomMove = moves[Math.floor(Math.random() * moves.length)];
+                swapPieces(randomMove);
+            }
+        }
+
+        function getValidMoves() {
+            const emptyIdx = slideBoard.indexOf(0);
+            const r = Math.floor(emptyIdx / 3);
+            const c = emptyIdx % 3;
+            const moves = [];
+
+            if (r > 0) moves.push(emptyIdx - 3); // Up
+            if (r < 2) moves.push(emptyIdx + 3); // Down
+            if (c > 0) moves.push(emptyIdx - 1); // Left
+            if (c < 2) moves.push(emptyIdx + 1); // Right
+
+            return moves;
+        }
+
+        function swapPieces(idx) {
+            const emptyIdx = slideBoard.indexOf(0);
+            slideBoard[emptyIdx] = slideBoard[idx];
+            slideBoard[idx] = 0;
+        }
+
+        function drawSlidePuzzle(container, difficultyName) {
+            container.innerHTML = `
+                <div class="text-xs text-zinc-400 font-mono mb-2 uppercase tracking-wider">配線盤回路復旧 - 難易度 [${difficultyName}]</div>
+                <p class="text-sm text-zinc-300 mb-4 font-medium">
+                    数字タイルをタップして隣の空隙にスライドさせ、<span class="text-zinc-100 font-bold underline">「1から8」の順に並び替えろ！</span>
+                </p>
+                <div class="grid grid-cols-3 gap-2 w-48 h-48 mx-auto mb-4 bg-zinc-900 p-2 rounded-xl border border-zinc-700 shadow-inner">
+                    ${slideBoard.map((val, idx) => {
+                        if (val === 0) {
+                            return `<div class="bg-zinc-950 rounded-lg puzzle-cell border border-dashed border-zinc-800"></div>`;
+                        } else {
+                            // Correct placing color feedback
+                            const isCorrect = (val === idx + 1);
+                            const cellClass = isCorrect 
+                                ? "bg-zinc-200 text-zinc-900 border-white shadow-[0_0_8px_#fff]" 
+                                : "bg-zinc-800 text-zinc-300 border-zinc-700";
+                            return `
+                                <button onclick="clickPuzzleCell(${idx})" class="w-full h-full flex items-center justify-center font-bold text-base rounded-lg border transition-all duration-200 active:scale-95 ${cellClass} puzzle-cell cursor-pointer">
+                                    ${val}
+                                </button>
+                            `;
+                        }
+                    }).join('')}
+                </div>
+                <div class="text-[10px] text-zinc-500 font-mono">※タップすると隣に空きスロットがある場合にスライドします</div>
+            `;
+        }
+
+        function clickPuzzleCell(idx) {
+            const valid = getValidMoves();
+            if (valid.includes(idx)) {
+                swapPieces(idx);
+                // Redraw
+                const activeStep = gameStory[currentStepIndex];
+                const interactionPanel = document.getElementById("interaction-panel");
+                const difficultyName = activeStep.interactive === "insert_battery_hard" ? "HARD" : "NORMAL";
+                drawSlidePuzzle(interactionPanel, difficultyName);
+                
+                // Check win condition
+                if (checkPuzzleWin()) {
+                    alertBox("完璧だ！電気配線回路がすべて整合し、超大容量ゲートのラッチが外れた！");
+                    setTimeout(() => {
+                        forceNextStep();
+                    }, 1200);
+                }
+            }
+        }
+
+        function checkPuzzleWin() {
+            for (let i = 0; i < 8; i++) {
+                if (slideBoard[i] !== i + 1) return false;
+            }
+            return true;
+        }
+
+        // --- STORY/GAMEPLAY FUNCTIONS ---
+        function triggerSpecificStep(id) {
+            const index = gameStory.findIndex(step => step.id === id);
+            if (index !== -1) {
+                currentStepIndex = index;
+                saveGameProgress();
+                updateUI();
+                trigger3DTransition();
+            }
+        }
+
+        function navigateDuct(direction) {
+            if (direction === 'left') {
+                shakeScreen();
+                alertBox("間違った分岐だ！行き止まりで大きなファンが回っている。戻って別の道を選ぼう。");
+            } else {
+                alertBox("正しい分岐だ！通気口の奥へとすり抜けることに成功した！");
+                forceNextStep();
+            }
+        }
+
+        function attemptJump() {
+            const indicator = document.getElementById("jump-indicator");
+            if (indicator) {
+                const pos = parseFloat(indicator.style.left);
+                if (pos >= 40 && pos <= 60) {
+                    alertBox("JUMP 成功！陥没を飛び越え、牢屋の鍵を獲得！");
+                    forceNextStep();
+                } else {
+                    shakeScreen();
+                    alertBox("ジャンプ失敗！奈落の縁をギリギリで掴んで復帰した。もう一度タイミングを合わせろ！");
+                }
+            }
+        }
+
+        let heatValue = 0;
+        function heatUpLock() {
+            heatValue += 16;
+            if (heatValue > 100) heatValue = 100;
+            const bar = document.getElementById("burn-progress");
+            if (bar) {
+                bar.style.width = heatValue + "%";
+                if (heatValue >= 100) {
+                    alertBox("ロックの解除に成功した！鍵を使用可能になった！");
+                    heatValue = 0;
+                    forceNextStep();
+                }
+            }
+        }
+
+        function hackMemoryGame() {
+            alertBox("強制バグ誘発に成功！記憶システムが完全にスパークして破壊された！おかかおにぎりの鍵がひらいた！");
+            forceNextStep();
+        }
+
+        function sliceRope() {
+            shakeScreen();
+            alertBox("木製の留め具が完全にへし折れた！吊り橋が昆布おにぎりごと暗闇の底へ落ちていく！");
+            forceNextStep();
+        }
+
+        function dodgeSuccess(side) {
+            alertBox(`反射的に${side}へ跳んだ！敵は空を切り、自爆した！`);
+            forceNextStep();
+        }
+
+        function sacrificeAction(action) {
+            if (action === 'refuse') {
+                shakeScreen();
+                alertBox("海鮮丼の怒りメーターが限界だ！恐ろしい視線で威嚇されたが、あなたはギリギリで踏みとどまった。");
+            } else {
+                alertBox("あなたは涙を流すおにぎりを抱き上げ、静かに廃棄処分箱へ落とした。罪悪感が走るが、これで生き延びた。");
+                forceNextStep();
+            }
+        }
+
+        function dashLaser() {
+            const status = document.getElementById("laser-status");
+            if (status && status.innerText.includes("安全")) {
+                alertBox("ダッシュ成功！赤い感知レーザーが照射される前に、次のエリアに滑り込んだ！");
+                forceNextStep();
+            } else {
+                shakeScreen();
+                alertBox("警報！センサーに検知されて自動防御システムが作動した。急いで最初の安全ポイントまで後退した！");
+            }
+        }
+
+        let darumaStepCount = 0;
+        function stepDaruma() {
+            const voice = document.getElementById("daruma-voice");
+            if (voice && (voice.innerText.includes("ころんだ！") || voice.innerText === "……")) {
+                shakeScreen();
+                alertBox("看護師がこちらを注視しているときに動いてしまった！捕縛されて病室からやり直しになります。");
+                darumaStepCount = 0;
+                currentStepIndex = 85; // Restart of Hospital
+                updateUI();
+            } else {
+                darumaStepCount += 15;
+                if (darumaStepCount > 100) darumaStepCount = 100;
+                const pBar = document.getElementById("daruma-p");
+                if (pBar) pBar.style.width = darumaStepCount + "%";
+                
+                if (darumaStepCount >= 100) {
+                    alertBox("おめでとう！だるまさんが転んだをクリアし、看護師の追跡を完全に振り切った！");
+                    darumaStepCount = 0;
+                    forceNextStep();
+                } else {
+                    alertBox("前進中…！まだ気を抜くな。");
+                }
+            }
+        }
+
+        function obeyDecision(agree) {
+            if (agree) {
+                alertBox("あなたは男に従い、錆びたコンテナへと引きずられていった。");
+                forceNextStep();
+            } else {
+                shakeScreen();
+                alertBox("男に激しく噛み付き反抗したが、即座に丸呑みされてしまった。ゲームオーバー！独房から再開。");
+                currentStepIndex = 94; // Retrigger Cell
+                updateUI();
+            }
+        }
+
+        function alertBox(text) {
+            const box = document.getElementById("center-notification");
+            const txt = document.getElementById("notification-text");
+            txt.innerText = text;
+            box.classList.remove("hidden");
+            setTimeout(() => {
+                box.classList.add("hidden");
+            }, 4000);
+        }
+
+        // --- THREE.JS 3D WORLD BUILDER & ANIMATOR ---
+        function init3D() {
+            const container = document.getElementById("canvas-container");
+            container.innerHTML = ""; // Clear existing canvas
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0a0a0c, 0.06);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(0, 1.8, 6.5);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(0x0c0c0e, 1);
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            ambientLight = new THREE.AmbientLight(0x222428, 0.8);
+            scene.add(ambientLight);
+
+            directionalLight = new THREE.DirectionalLight(0xa1a1aa, 1.5);
+            directionalLight.position.set(5, 12, 5);
+            scene.add(directionalLight);
+
+            pointLight = new THREE.PointLight(0xffffff, 2, 25);
+            pointLight.position.set(0, 2, 2);
+            scene.add(pointLight);
+
+            // Level Geometry
+            const stage = gameStory[currentStepIndex].id;
+            const wallGeo = new THREE.BoxGeometry(11, 9, 32);
+            const wallMat = new THREE.MeshStandardMaterial({
+                color: stage >= 115 && stage <= 122 ? 0x94a3b8 : (stage >= 133 ? 0x4b5563 : 0x18181b),
+                roughness: 0.85,
+                metalness: 0.15,
+                side: THREE.BackSide
+            });
+            mazeWall = new THREE.Mesh(wallGeo, wallMat);
+            scene.add(mazeWall);
+
+            // Player mesh shape builder
+            let shapeGeo;
+            if (stage >= 42 && stage < 47) {
+                shapeGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 16);
+            } else if (stage >= 47 && stage < 68) {
+                shapeGeo = new THREE.SphereGeometry(0.75, 16, 16);
+            } else if (stage >= 133) {
+                // Human form for later story arcs
+                shapeGeo = new THREE.CylinderGeometry(0.35, 0.35, 1.8, 16);
+            } else {
+                shapeGeo = new THREE.ConeGeometry(0.85, 1.25, 3);
+            }
+            
+            const shapeMat = new THREE.MeshStandardMaterial({
+                color: stage >= 115 && stage <= 122 ? 0xe2e8f0 : 0xe4e4e7,
+                roughness: 0.4,
+                metalness: 0.1
+            });
+            playerMesh = new THREE.Mesh(shapeGeo, shapeMat);
+            playerMesh.position.set(0, 0.2, 0);
+            playerMesh.rotation.y = Math.PI / 6;
+            scene.add(playerMesh);
+
+            // Enemy Mesh Setup
+            if (stage >= 8 && stage <= 13 || stage == 24 || stage == 63 || stage == 97 || stage == 117 || stage === 143 || stage === 144) {
+                const enemyGeo = new THREE.ConeGeometry(0.8, 1.4, 4);
+                const enemyMat = new THREE.MeshStandardMaterial({
+                    color: 0x27272a,
+                    emissive: 0x09090b,
+                    roughness: 0.3
+                });
+                enemyMesh = new THREE.Mesh(enemyGeo, enemyMat);
+                enemyMesh.position.set(0, 0.2, -5.5);
+                scene.add(enemyMesh);
+            }
+
+            // Spores / Particles
+            const partCount = 140;
+            const partGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(partCount * 3);
+            for(let i=0; i<partCount * 3; i+=3) {
+                positions[i] = (Math.random() - 0.5) * 12;
+                positions[i+1] = (Math.random() - 0.5) * 8;
+                positions[i+2] = (Math.random() - 0.5) * 24;
+            }
+            partGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const partMat = new THREE.PointsMaterial({
+                color: stage >= 115 && stage <= 122 ? 0x94a3b8 : 0x71717a,
+                size: 0.07,
+                transparent: true,
+                opacity: 0.5
+            });
+            particles = new THREE.Points(partGeo, partMat);
+            scene.add(particles);
+
+            // Drag Controls
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            
+            const onPointerDown = (e) => {
+                isDragging = true;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                previousMousePosition = { x: clientX, y: clientY };
+            };
+
+            const onPointerMove = (e) => {
+                if (!isDragging) return;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const deltaX = clientX - previousMousePosition.x;
+
+                playerMesh.rotation.y += deltaX * 0.008;
+                camera.position.x = Math.sin(playerMesh.rotation.y) * 6.5;
+                camera.position.z = Math.cos(playerMesh.rotation.y) * 6.5;
+                camera.lookAt(playerMesh.position);
+
+                previousMousePosition = { x: clientX, y: clientY };
+            };
+
+            const onPointerUp = () => { isDragging = false; };
+
+            container.addEventListener('mousedown', onPointerDown);
+            container.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('mouseup', onPointerUp);
+
+            container.addEventListener('touchstart', onPointerDown, { passive: true });
+            container.addEventListener('touchmove', onPointerMove, { passive: true });
+            window.addEventListener('touchend', onPointerUp);
+
+            window.addEventListener('resize', onWindowResize);
+
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            animate();
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById("canvas-container");
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            animationFrameId = requestAnimationFrame(animate);
+
+            const stage = gameStory[currentStepIndex].id;
+
+            if (playerMesh) {
+                playerMesh.rotation.y += 0.003;
+                playerMesh.position.y = Math.sin(Date.now() * 0.0015) * 0.12;
+            }
+
+            if (particles) {
+                const positions = particles.geometry.attributes.position.array;
+                for (let i = 1; i < positions.length; i += 3) {
+                    positions[i] -= 0.008;
+                    if (positions[i] < -4) {
+                        positions[i] = 4;
+                    }
+                }
+                particles.geometry.attributes.position.needsUpdate = true;
+            }
+
+            if (enemyMesh) {
+                enemyMesh.position.z = -5.5 + Math.sin(Date.now() * 0.002) * 1.5;
+                enemyMesh.lookAt(playerMesh.position);
+            }
+
+            if (stage === 101 || stage === 102 || stage === 121 || stage === 122) {
+                camera.position.x += Math.sin(Date.now() * 0.008) * 0.03;
+                camera.position.y += Math.cos(Date.now() * 0.012) * 0.02;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- TRANSITIONS ---
+        function trigger3DTransition() {
+            const stage = gameStory[currentStepIndex].id;
+            
+            let initialColor = pointLight.color.getHex();
+            pointLight.color.setHex(0xffffff);
+            setTimeout(() => {
+                pointLight.color.setHex(initialColor);
+            }, 250);
+
+            if (stage >= 115 && stage <= 122) {
+                scene.fog.color.setHex(0xf1f5f9);
+                renderer.setClearColor(0xe2e8f0, 1);
+                ambientLight.color.setHex(0x94a3b8);
+                directionalLight.color.setHex(0xffffff);
+            } else if (stage >= 133) {
+                scene.fog.color.setHex(0x111827);
+                renderer.setClearColor(0x1c1d21, 1);
+                ambientLight.color.setHex(0x4b5563);
+                directionalLight.color.setHex(0xd1d5db);
+            } else {
+                scene.fog.color.setHex(0x0a0a0c);
+                renderer.setClearColor(0x0c0c0e, 1);
+                ambientLight.color.setHex(0x222428);
+                directionalLight.color.setHex(0xa1a1aa);
+            }
+
+            if (playerMesh) {
+                if (stage >= 42 && stage < 47) {
+                    playerMesh.geometry = new THREE.CylinderGeometry(0.4, 0.4, 1.8, 16);
+                } else if (stage >= 47 && stage < 68) {
+                    playerMesh.geometry = new THREE.SphereGeometry(0.75, 16, 16);
+                } else if (stage >= 133) {
+                    playerMesh.geometry = new THREE.CylinderGeometry(0.35, 0.35, 1.8, 16);
+                } else {
+                    playerMesh.geometry = new THREE.ConeGeometry(0.85, 1.25, 3);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
