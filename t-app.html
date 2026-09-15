@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>t-app 管理ダッシュボード</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .full-viewport { height: 100vh; width: 100vw; }
+    </style>
+</head>
+<body class="bg-gray-950 text-white m-0 p-0 overflow-hidden">
+
+    <!-- メニューボタン（右上に配置） -->
+    <button onclick="toggleMenu()" id="menuBtn" class="fixed top-4 right-4 z-50 text-2xl bg-white/10 hover:bg-white/20 text-white w-12 h-12 rounded-full backdrop-blur-md transition-all flex items-center justify-center border border-white/10 shadow-lg">
+        ≡
+    </button>
+
+    <!-- メニューパネル -->
+    <div id="menuPanel" class="fixed top-20 right-4 z-40 w-72 bg-gray-900/90 border border-white/10 rounded-2xl p-6 shadow-2xl backdrop-blur-xl transition-all hidden">
+        <h3 class="font-bold mb-4 text-gray-400 uppercase text-xs tracking-widest">Controls</h3>
+        <input type="file" id="fileInput" accept=".t-app" class="hidden">
+        <label for="fileInput" class="block w-full text-center bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl cursor-pointer transition mb-3">
+            ファイルをアップロード
+        </label>
+        <button onclick="clearApp()" class="w-full text-center bg-white/5 hover:bg-red-900/50 text-gray-300 py-3 rounded-xl transition">
+            リセット
+        </button>
+    </div>
+
+    <!-- アプリ表示エリア -->
+    <div id="appContainer" class="w-full h-screen">
+        <iframe id="iframeDisplay" class="w-full h-full border-none"></iframe>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const iframeDisplay = document.getElementById('iframeDisplay');
+        const menuPanel = document.getElementById('menuPanel');
+        const menuBtn = document.getElementById('menuBtn');
+
+        // サンプルt-appの内容
+        const sampleApp = `
+            <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#111; color:#fff; font-family:sans-serif;">
+                <div style="text-align:center;">
+                    <h1>t-app Sample</h1>
+                    <p>初期表示されているサンプルアプリです。</p>
+                </div>
+            </div>
+        `;
+
+        window.onload = () => {
+            const savedApp = localStorage.getItem('t-app-data');
+            if (savedApp) {
+                iframeDisplay.srcdoc = savedApp;
+            } else {
+                iframeDisplay.srcdoc = sampleApp;
+            }
+        };
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const content = event.target.result;
+                localStorage.setItem('t-app-data', content);
+                iframeDisplay.srcdoc = content;
+                toggleMenu(); // アップロードしたらメニューを閉じる
+            };
+            reader.readAsText(file);
+        });
+
+        function clearApp() {
+            localStorage.removeItem('t-app-data');
+            iframeDisplay.srcdoc = sampleApp;
+            toggleMenu();
+        }
+
+        function toggleMenu() {
+            const isHidden = menuPanel.classList.toggle('hidden');
+            menuBtn.textContent = isHidden ? '≡' : '×';
+        }
+    </script>
+</body>
+</html>
