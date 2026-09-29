@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MUSIC STUDIO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+<style type="text/tailwindcss">
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{height:100%;background:#f0f9ff;font-family:Inter,system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;user-select:none;-webkit-user-select:none}
+.font-logo{font-family:Outfit,Inter,sans-serif}
+.b{@apply bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-3 py-2 rounded-xl transition flex items-center gap-1.5 active:scale-95 text-xs md:text-sm shrink-0}
+.lab{@apply flex justify-between items-center mb-1 font-medium text-slate-700}
+.lab span{@apply font-mono font-semibold text-cyan-600}
+input[type=range]{@apply w-full accent-cyan-500 cursor-pointer}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}
+.track-item{transition:all .15s}
+.track-item.active{box-shadow:0 0 0 2px #06b6d4}
+</style>
+</head>
+<body class="text-slate-800 flex flex-col overflow-hidden">
+<header class="bg-white/90 backdrop-blur-md border-b border-sky-100 px-3 md:px-5 py-2.5 flex items-center justify-between gap-2 shadow-sm z-30 shrink-0">
+  <div class="flex items-center gap-3 shrink-0">
+    <button id="tg" class="lg:hidden p-2 text-slate-600 hover:bg-sky-100/50 rounded-xl text-lg leading-none">☰</button>
+    <div class="bg-gradient-to-tr from-cyan-500 to-sky-400 px-2.5 py-1.5 rounded-xl text-white shadow-md shadow-cyan-500/20 text-lg leading-none">♪</div>
+    <div class="hidden sm:flex flex-col">
+      <span class="font-logo font-extrabold tracking-wider bg-gradient-to-r from-cyan-600 to-sky-500 bg-clip-text text-transparent text-lg leading-none">MUSIC STUDIO</span>
+      <span class="text-[10px] font-medium text-sky-600/70 tracking-widest uppercase">Tone.js · Unlimited Tracks</span>
+    </div>
+  </div>
+  <div class="flex items-center gap-2 overflow-x-auto">
+    <button id="play" class="bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-white font-semibold px-4 py-2 rounded-xl transition shadow-md shadow-cyan-500/20 active:scale-95 text-xs md:text-sm shrink-0">▶ 再生</button>
+    <button id="stop" class="b">■ 停止</button>
+    <div class="flex items-center gap-1.5 bg-sky-50/80 border border-sky-100 px-2.5 py-1.5 rounded-xl shrink-0">
+      <span class="text-xs font-bold text-sky-700">BPM</span>
+      <input id="hbpm" type="number" min="40" max="240" value="120" class="w-14 bg-white border border-sky-200 rounded-lg px-1.5 py-0.5 text-xs font-mono font-bold text-cyan-900 text-center focus:outline-none focus:ring-2 focus:ring-cyan-500">
+    </div>
+    <input type="file" id="file" accept=".json" class="hidden">
+    <button id="open" class="b">📂<span class="hidden md:inline">開く</span></button>
+    <button id="save" class="b bg-sky-50 border border-sky-200 text-sky-700">💾<span class="hidden md:inline">保存</span></button>
+    <button id="addm" class="b bg-emerald-50 border border-emerald-200 text-emerald-700">＋<span class="hidden sm:inline">小節</span><span id="badge" class="bg-emerald-200/80 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold">4小節</span></button>
+    <button id="copy" class="b">⧉<span class="hidden lg:inline">コピー</span></button>
+    <button id="paste" class="b">📋<span class="hidden lg:inline">貼り付け</span></button>
+    <button id="all" class="b">▦<span class="hidden lg:inline">全選択</span></button>
+    <button id="exp" class="b bg-emerald-50 border border-emerald-200 text-emerald-700">⬇<span class="hidden md:inline">音声保存</span></button>
+  </div>
+</header>
+
+<div class="flex-1 flex overflow-hidden relative">
+  <div id="ov" class="fixed inset-0 bg-slate-900/30 z-30 hidden"></div>
+  <aside id="sb" class="fixed lg:relative top-0 left-0 h-full w-80 bg-white/95 border-r border-sky-100 flex flex-col z-40 -translate-x-full lg:translate-x-0 transition-transform duration-300 shadow-xl lg:shadow-none shrink-0">
+    <div class="p-4 border-b border-sky-100 flex items-center justify-between">
+      <span class="font-bold text-slate-800">🎚 トラック</span>
+      <button id="addTrack" class="b bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs py-1.5 px-2.5">＋ 追加</button>
+    </div>
+    <div class="p-3 space-y-2 overflow-y-auto flex-1 text-xs md:text-sm">
+      <div id="trackList" class="space-y-1.5"></div>
+      <hr class="border-sky-100 my-3">
+      <div>
+        <label class="block font-medium text-slate-700 mb-1.5">トラック名</label>
+        <input id="tname" type="text" maxlength="20" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium focus:ring-2 focus:ring-cyan-400 focus:outline-none" placeholder="トラック名">
+      </div>
+      <div>
+        <label class="block font-medium text-slate-700 mb-1.5">楽器</label>
+        <select id="ins" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-medium focus:ring-2 focus:ring-cyan-400 focus:outline-none"></select>
+      </div>
+      <div>
+        <div class="lab">トラック音量<span id="volv">-6 dB</span></div>
+        <input id="vol" type="range" min="-30" max="6" step="1" value="-6">
+        <div class="flex gap-2 mt-2">
+          <button id="mute" class="b flex-1 justify-center">🔈 ミュート</button>
+          <button id="delTrack" class="b bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 flex-1 justify-center">🗑 削除</button>
+        </div>
+      </div>
+      <hr class="border-sky-100">
+      <div><div class="lab">リバーブ<span id="rvv">15%</span></div><input id="rv" type="range" min="0" max="0.8" step="0.05" value="0.15"></div>
+      <div><div class="lab">テンポ (BPM)<span id="bpmv">120</span></div><input id="bpm" type="range" min="60" max="200" value="120"></div>
+      <div><div class="lab">マスター音量<span id="mvv">80%</span></div><input id="mv" type="range" min="0" max="1" step="0.05" value="0.8"></div>
+      <p class="text-[11px] leading-relaxed text-slate-500 bg-sky-50/80 border border-sky-100 rounded-xl p-3">
+        空白タップでノート追加／ドラッグで移動／右端ドラッグで長さ変更／空白ドラッグで範囲選択。<br>
+        定規をタップで再生開始位置を指定。スクロールは鍵盤列・定規を指でなぞってください。<br>
+        <strong>Space</strong> 再生/停止 ・ <strong>Del</strong> 削除 ・ <strong>Ctrl+C/V/A</strong> コピー/貼付/全選択
+      </p>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-hidden bg-white">
+    <div id="wrap" class="h-full overflow-auto relative">
+      <div class="inline-block min-w-full">
+        <div class="sticky top-0 z-20 flex bg-white border-b border-sky-200">
+          <div class="w-14 shrink-0 sticky left-0 z-30 bg-slate-100 border-r border-sky-100"></div>
+          <canvas id="ruler" class="block cursor-pointer"></canvas>
+        </div>
+        <div class="flex">
+          <div id="keys" class="w-14 shrink-0 sticky left-0 z-10 bg-slate-100 border-r border-sky-100"></div>
+          <canvas id="grid" class="block cursor-crosshair" style="touch-action:none"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="sheet" class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-sky-200 p-3 shadow-2xl z-40 translate-y-full transition-transform duration-200">
+  <div class="max-w-3xl mx-auto flex items-center justify-between gap-2">
+    <span id="sinfo" class="text-xs md:text-sm font-bold text-sky-800 bg-sky-100 px-2.5 py-1 rounded-lg truncate"></span>
+    <div class="flex items-center gap-1.5 shrink-0">
+      <button id="dm" class="b">－</button>
+      <span class="text-xs text-slate-500">長さ</span>
+      <button id="dp" class="b">＋</button>
+      <button id="del" class="b bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">🗑<span class="hidden sm:inline">削除</span></button>
+      <button id="cls" class="b bg-transparent">✕</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const MIN = 36, MAX = 84, KH = 28, GW = 22, BAR = 16;
+const BK = [1, 3, 6, 8, 10];
+const NN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const nname = m => NN[m % 12] + (Math.floor(m / 12) - 1);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const E = (a, d, s, r) => ({ attack: a, decay: d, sustain: s, release: r });
+
+/* カラーパレット */
+const COLORS = [
+  ['#22d3ee', '#0284c7'],
+  ['#34d399', '#047857'],
+  ['#f472b6', '#be185d'],
+  ['#a78bfa', '#6d28d9'],
+  ['#fb923c', '#c2410c'],
+  ['#facc15', '#a16207'],
+  ['#38bdf8', '#0369a1'],
+  ['#4ade80', '#15803d'],
+  ['#e879f9', '#a21caf'],
+  ['#f87171', '#b91c1c'],
+  ['#2dd4bf', '#0f766e'],
+  ['#c084fc', '#7e22ce'],
+];
+
+/* Web Audio ルーティング */
+const master = new Tone.Gain(0.8).toDestination();
+const rev = new Tone.Freeverb({ roomSize: 0.75, dampening: 3000, wet: 0.15 }).connect(master);
+
+/* Scratch風の楽器 */
+const INS = {
+  'ピアノ':       ['Synth',    { oscillator: { type: 'triangle' }, envelope: E(0.005, 0.5, 0.1, 0.8) }, '8n', 0],
+  'エレピ':       ['FMSynth',  { harmonicity: 3, modulationIndex: 1.5, envelope: E(0.01, 0.6, 0.2, 0.8), modulationEnvelope: E(0.01, 0.4, 0.1, 0.5) }, '8n', -4],
+  'オルガン':     ['AMSynth',  { harmonicity: 2, envelope: E(0.01, 0.1, 0.9, 0.1) }, '8n', -4],
+  'ギター':       ['Pluck',    { attackNoise: 1.5, dampening: 3000, resonance: 0.95 }, '8n', 2],
+  'ベース':       ['MonoSynth',{ oscillator: { type: 'square' }, filter: { Q: 2, type: 'lowpass', rolloff: -24 }, filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.3, baseFrequency: 150, octaves: 2.5, release: 0.2 }, envelope: E(0.01, 0.2, 0.5, 0.2) }, '8n', 0],
+  'ピチカート':   ['Pluck',    { attackNoise: 0.6, dampening: 6000, resonance: 0.9 }, '16n', 2],
+  'チェロ':       ['Synth',    { oscillator: { type: 'sawtooth' }, envelope: E(0.12, 0.3, 0.7, 0.5) }, '4n', -12],
+  'トロンボーン': ['Synth',    { oscillator: { type: 'sawtooth' }, envelope: E(0.08, 0.2, 0.8, 0.3) }, '8n', -12],
+  'クラリネット': ['Synth',    { oscillator: { type: 'square' }, envelope: E(0.05, 0.1, 0.8, 0.2) }, '8n', -14],
+  'サックス':     ['FMSynth',  { harmonicity: 1, modulationIndex: 6, envelope: E(0.05, 0.2, 0.7, 0.3) }, '8n', -10],
+  'フルート':     ['Synth',    { oscillator: { type: 'sine' }, envelope: E(0.06, 0.1, 0.8, 0.3) }, '8n', -2],
+  '合唱':         ['AMSynth',  { harmonicity: 1.01, envelope: E(0.25, 0.3, 0.8, 0.8) }, '4n', -4],
+  'ビブラフォン': ['FMSynth',  { harmonicity: 4, modulationIndex: 1, envelope: E(0.005, 1.2, 0.05, 1.2) }, '8n', -4],
+  'オルゴール':   ['FMSynth',  { harmonicity: 5.01, modulationIndex: 2, envelope: E(0.001, 0.9, 0, 0.8) }, '8n', -6],
+  'スチールドラム':['FMSynth', { harmonicity: 1.5, modulationIndex: 3, envelope: E(0.001, 0.5, 0, 0.4) }, '8n', -4],
+  'マリンバ':     ['FMSynth',  { harmonicity: 3.99, modulationIndex: 0.6, envelope: E(0.001, 0.35, 0, 0.3) }, '8n', -2],
+  'シンセリード': ['Synth',    { oscillator: { type: 'fatsawtooth', count: 3, spread: 20 }, envelope: E(0.01, 0.2, 0.6, 0.3) }, '8n', -14],
+  'シンセパッド': ['Synth',    { oscillator: { type: 'fatsine', count: 3, spread: 30 }, envelope: E(0.4, 0.4, 0.8, 1) }, '2n', -8],
+};
+
+function makeIns(name, out) {
+  if (name === 'ドラムキット' || !INS[name]) return null;
+  const [k, o, d, g] = INS[name];
+  let s;
+  if (k === 'Pluck') {
+    s = new Tone.PluckSynth(o);
+  } else {
+    s = new Tone.PolySynth(Tone[k], o);
+    s.maxPolyphony = 8;
+  }
+  s.volume.value = g;
+  s.connect(out);
+  return {
+    play: (n, t, du) => k === 'Pluck' ? s.triggerAttack(n, t) : s.triggerAttackRelease(n, du || d, t),
+    stop: () => s.releaseAll && s.releaseAll(),
+    dispose: () => s.dispose()
+  };
+}
+
+/* ドラム */
+const dvol = new Tone.Volume(-4).connect(rev);
+const hpf = new Tone.Filter(7000, 'highpass').connect(dvol);
+const nz = (t, d, o, v) => {
+  const n = new Tone.NoiseSynth({ noise: { type: t }, envelope: E(0.001, d, 0, 0.01) }).connect(o);
+  n.volume.value = v;
+  return n;
+};
+const kick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: E(0.001, 0.3, 0, 0.1) }).connect(dvol);
+const snare = nz('white', 0.16, dvol, -6);
+const hh = nz('white', 0.04, hpf, -8);
+const oh = nz('white', 0.25, hpf, -8);
+const clap = nz('pink', 0.12, dvol, -4);
+const bell = new Tone.Synth({ oscillator: { type: 'square' }, envelope: E(0.001, 0.25, 0, 0.05) }).connect(dvol);
+bell.volume.value = -16;
+
+const DR = [
+  ['バスドラム', t => kick.triggerAttackRelease('C1', '8n', t)],
+  ['スネア',     t => snare.triggerAttackRelease('16n', t)],
+  ['クローズHH', t => hh.triggerAttackRelease('32n', t)],
+  ['オープンHH', t => oh.triggerAttackRelease('8n', t)],
+  ['クラップ',   t => clap.triggerAttackRelease('16n', t)],
+  ['カウベル',   t => bell.triggerAttackRelease('A5', '16n', t)],
+];
+const dname = m => {
+  const p = m % 12;
+  return p < 2 ? 0 : p < 4 ? 1 : p < 7 ? 2 : p < 9 ? 3 : p < 11 ? 4 : 5;
+};
+
+/* 状態 */
+let trackIdCounter = 0;
+const TR = []; // dynamic tracks
+const S = {
+  notes: [],
+  sel: new Set(),
+  tr: 0,       // current track index
+  total: 64,
+  tick: -1,
+  start: 0,
+  clip: [],
+  cur: null
+};
+let uid = 0, D = null, step = 0, rec = null;
+
+function createTrack(name, ins = 'ピアノ', isDrum = false) {
+  const id = trackIdCounter++;
+  const colorIdx = TR.length % COLORS.length;
+  const volNode = new Tone.Volume(-6).connect(rev);
+  const track = {
+    id,
+    n: name || `トラック ${TR.length + 1}`,
+    ins: isDrum ? 'ドラムキット' : ins,
+    isDrum,
+    c: COLORS[colorIdx],
+    top: isDrum ? 64 : 72,
+    v: volNode,
+    inst: isDrum ? null : makeIns(ins, volNode),
+  };
+  TR.push(track);
+  return track;
+}
+
+function disposeTrack(t) {
+  if (t.inst) {
+    t.inst.stop();
+    t.inst.dispose();
+    t.inst = null;
+  }
+  t.v.dispose();
+}
+
+function sound(trIdx, pitch, du, time) {
+  const t = TR[trIdx];
+  if (!t || t.v.mute) return;
+  if (t.isDrum) {
+    DR[dname(pitch)][1](time);
+  } else if (t.inst) {
+    t.inst.play(Tone.Frequency(pitch, 'midi').toNote(), time, du);
+  }
+}
+
+const aud = p => {
+  Tone.start();
+  sound(S.tr, p, '0:0:2', Tone.now() + 0.02);
+};
+
+const lab = n => {
+  const t = TR[n.tr];
+  if (t && t.isDrum) return DR[dname(n.pitch)][0];
+  return nname(n.pitch);
+};
+
+const add = (tr, start, pitch, dur = 4) => {
+  S.notes.push({ id: ++uid, tr, start, pitch, dur });
+};
+
+/* 初期トラックとデモノート */
+createTrack('メロディ', 'ピアノ');
+createTrack('ベース', 'ベース');
+createTrack('ドラム', 'ドラムキット', true);
+
+for (let i = 0; i < 4; i++) {
+  add(0, i * 16, 72 + [0, 4, 7, 4][i], 4);
+  add(0, i * 16 + 4, 76 + [0, -1, 0, -2][i], 4);
+  add(0, i * 16 + 8, 79, 6);
+  add(1, i * 16, [48, 43, 45, 41][i], 8);
+  add(1, i * 16 + 8, [48, 43, 45, 41][i] + 7, 4);
+  for (let j = 0; j < 16; j += 2) add(2, i * 16 + j, 52, 1);
+  [0, 8].forEach(j => add(2, i * 16 + j, 48, 2));
+  [4, 12].forEach(j => add(2, i * 16 + j, 50, 2));
+}
+
+/* 描画 */
+const gc = $('grid'), x = gc.getContext('2d');
+const rc = $('ruler'), rx = rc.getContext('2d');
+const L = (a, b, c, d) => { x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); };
+
+function resize() {
+  gc.width = rc.width = S.total * GW + 200;
+  gc.height = (MAX - MIN + 1) * KH;
+  rc.height = 32;
+  $('badge').textContent = Math.ceil(S.total / BAR) + '小節';
+  drawGrid();
+  drawRuler();
+}
+
+function drawRuler() {
+  rx.fillStyle = '#fff';
+  rx.fillRect(0, 0, rc.width, 32);
+  rx.font = '500 11px Inter,sans-serif';
+  rx.strokeStyle = '#cbd5e1';
+  rx.fillStyle = '#64748b';
+  for (let t = 0; t <= S.total; t++) {
+    const px = t * GW;
+    if (t % BAR === 0) {
+      rx.beginPath(); rx.moveTo(px, 4); rx.lineTo(px, 32); rx.stroke();
+      rx.fillText(t / BAR + 1, px + 4, 15);
+    } else if (t % 4 === 0) {
+      rx.beginPath(); rx.moveTo(px, 22); rx.lineTo(px, 32); rx.stroke();
+    }
+  }
+  rx.fillStyle = '#06b6d4';
+  rx.beginPath();
+  rx.moveTo(S.start * GW - 6, 18);
+  rx.lineTo(S.start * GW + 6, 18);
+  rx.lineTo(S.start * GW, 30);
+  rx.fill();
+}
+
+function drawNote(n, al) {
+  const px = n.start * GW, py = (MAX - n.pitch) * KH, w = n.dur * GW;
+  const sel = S.sel.has(n.id);
+  const t = TR[n.tr];
+  const c = t ? t.c : ['#94a3b8', '#64748b'];
+  x.globalAlpha = al;
+  const g = x.createLinearGradient(px, py, px + w, py + KH);
+  g.addColorStop(0, sel ? '#818cf8' : c[0]);
+  g.addColorStop(1, sel ? '#4f46e5' : c[1]);
+  x.fillStyle = g;
+  x.beginPath();
+  x.roundRect(px + 1.5, py + 2.5, w - 3, KH - 5, 6);
+  x.fill();
+  x.strokeStyle = sel ? '#c7d2fe' : 'rgba(255,255,255,.6)';
+  x.lineWidth = sel ? 2.5 : 1;
+  x.stroke();
+  if (w > 26) {
+    x.fillStyle = '#fff';
+    x.font = 'bold 12px Inter,sans-serif';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.fillText(lab(n), px + w / 2, py + KH / 2, w - 6);
+  }
+  x.globalAlpha = 1;
+}
+
+function drawGrid() {
+  const W = gc.width, H = gc.height;
+  x.clearRect(0, 0, W, H);
+  x.lineWidth = 1;
+  for (let i = 0; i <= MAX - MIN; i++) {
+    x.fillStyle = BK.includes((MAX - i) % 12) ? '#f1f5f9' : '#fff';
+    x.fillRect(0, i * KH, W, KH);
+    x.strokeStyle = '#e2e8f0';
+    L(0, (i + 1) * KH, W, (i + 1) * KH);
+  }
+  for (let t = 0; t <= S.total; t++) {
+    x.strokeStyle = t % BAR ? (t % 4 ? '#f1f5f9' : '#e2e8f0') : '#94a3b8';
+    x.lineWidth = t % BAR ? 1 : 1.5;
+    L(t * GW, 0, t * GW, H);
+  }
+  S.notes.filter(n => n.tr !== S.tr).forEach(n => drawNote(n, 0.28));
+  S.notes.filter(n => n.tr === S.tr).forEach(n => drawNote(n, 1));
+  if (D && D.k === 'b') {
+    x.fillStyle = 'rgba(99,102,241,.15)';
+    x.strokeStyle = '#6366f1';
+    x.lineWidth = 1.5;
+    x.setLineDash([4, 4]);
+    const bx = Math.min(D.x1, D.x2), by = Math.min(D.y1, D.y2);
+    const bw = Math.abs(D.x2 - D.x1), bh = Math.abs(D.y2 - D.y1);
+    x.fillRect(bx, by, bw, bh);
+    x.strokeRect(bx, by, bw, bh);
+    x.setLineDash([]);
+  }
+  const ph = (S.tick >= 0 ? S.tick : S.start) * GW;
+  x.strokeStyle = '#06b6d4';
+  x.lineWidth = 2;
+  L(ph, 0, ph, H);
+}
+
+function keys() {
+  const k = $('keys');
+  k.innerHTML = '';
+  const cur = TR[S.tr];
+  for (let m = MAX; m >= MIN; m--) {
+    const d = document.createElement('div');
+    const b = BK.includes(m % 12);
+    d.style.height = KH + 'px';
+    d.className = 'border-b border-sky-100 text-[10px] pr-2 flex items-center justify-end font-mono cursor-pointer ' +
+      (b ? 'bg-sky-900 text-sky-200' : 'bg-white text-slate-700 font-semibold');
+    if (cur && cur.isDrum) {
+      d.textContent = DR[dname(m)][0];
+    } else {
+      d.textContent = m % 12 ? '' : nname(m);
+    }
+    d.onpointerdown = () => aud(m);
+    k.append(d);
+  }
+}
+
+/* トラックUI */
+function renderTrackList() {
+  const list = $('trackList');
+  list.innerHTML = '';
+  TR.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'track-item flex items-center gap-2 p-2 rounded-xl cursor-pointer ' +
+      (i === S.tr ? 'active bg-gradient-to-r from-cyan-50 to-sky-50 border border-cyan-200' : 'bg-slate-50 hover:bg-slate-100 border border-transparent');
+    div.innerHTML = `
+      <div class="w-3 h-3 rounded-full shrink-0" style="background:${t.c[0]}"></div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-slate-800 truncate text-xs">${t.n}</div>
+        <div class="text-[10px] text-slate-500 truncate">${t.isDrum ? 'ドラムキット' : t.ins}</div>
+      </div>
+      <button class="text-slate-400 hover:text-slate-600 text-xs px-1" data-mute="${i}" title="ミュート">${t.v.mute ? '🔇' : '🔈'}</button>
+    `;
+    div.onclick = e => {
+      if (e.target.dataset.mute !== undefined) {
+        const idx = +e.target.dataset.mute;
+        TR[idx].v.mute = !TR[idx].v.mute;
+        renderTrackList();
+        if (idx === S.tr) updateTrackUI();
+        return;
+      }
+      selTrack(i);
+    };
+    list.append(div);
+  });
+}
+
+function updateTrackUI() {
+  const t = TR[S.tr];
+  if (!t) return;
+  $('tname').value = t.n;
+  $('ins').disabled = false;
+  $('ins').value = t.ins;
+  $('vol').value = t.v.volume.value;
+  $('volv').textContent = Math.round(t.v.volume.value) + ' dB';
+  $('mute').textContent = t.v.mute ? '🔇 ミュート中' : '🔈 ミュート';
+  $('delTrack').disabled = TR.length <= 1;
+  $('delTrack').classList.toggle('opacity-40', TR.length <= 1);
+}
+
+function selTrack(i, keep) {
+  if (i < 0 || i >= TR.length) return;
+  S.tr = i;
+  if (!keep) {
+    S.sel.clear();
+    closeSheet();
+  }
+  renderTrackList();
+  updateTrackUI();
+  if (!keep) {
+    keys();
+    const t = TR[i];
+    $('wrap').scrollTop = (MAX - t.top) * KH;
+  }
+  drawGrid();
+}
+
+function setIns(i, name) {
+  const t = TR[i];
+  if (!t) return;
+  if (t.inst) {
+    t.inst.stop();
+    t.inst.dispose();
+    t.inst = null;
+  }
+  t.isDrum = name === 'ドラムキット';
+  t.ins = name;
+  if (!t.isDrum) {
+    t.inst = makeIns(name, t.v);
+  }
+  t.top = t.isDrum ? 64 : 72;
+  renderTrackList();
+  updateTrackUI();
+  keys();
+  drawGrid();
+}
+
+/* 編集 */
+const ensure = t => {
+  let g = 0;
+  while (t > S.total) {
+    S.total += BAR;
+    g = 1;
+  }
+  if (g) resize();
+};
+
+function sheet(n) {
+  S.cur = n;
+  const t = TR[n.tr];
+  $('sinfo').textContent = `${t ? t.n : '?'} · ${lab(n)} · 長さ ${n.dur}`;
+  $('sheet').classList.remove('translate-y-full');
+}
+
+const closeSheet = () => {
+  S.cur = null;
+  $('sheet').classList.add('translate-y-full');
+};
+
+function delSel() {
+  S.notes = S.notes.filter(n => !S.sel.has(n.id));
+  S.sel.clear();
+  closeSheet();
+  drawGrid();
+}
+
+const cur = () => S.notes.filter(n => n.tr === S.tr);
+
+function down(p, right, sh) {
+  const f = [...cur()].reverse().find(n =>
+    p.x >= n.start * GW - 4 &&
+    p.x <= (n.start + n.dur) * GW + 4 &&
+    p.y >= (MAX - n.pitch) * KH &&
+    p.y <= (MAX - n.pitch + 1) * KH
+  );
+  if (right) {
+    if (f && !S.sel.has(f.id)) S.sel = new Set([f.id]);
+    delSel();
+    return;
+  }
+  if (f) {
+    if (sh) {
+      S.sel.has(f.id) ? S.sel.delete(f.id) : S.sel.add(f.id);
+    } else if (!S.sel.has(f.id)) {
+      S.sel = new Set([f.id]);
+    }
+    sheet(f);
+    D = p.x >= (f.start + f.dur) * GW - 12
+      ? { k: 'r', n: f }
+      : {
+          k: 'd', n: f,
+          ox: p.x - f.start * GW,
+          oy: p.y - (MAX - f.pitch) * KH,
+          bs: f.start, bp: f.pitch, lp: f.pitch,
+          pos: S.notes.filter(n => S.sel.has(n.id)).map(n => ({ n, s: n.start, p: n.pitch }))
+        };
+    aud(f.pitch);
+  } else {
+    if (!sh) S.sel.clear();
+    D = { k: 'b', x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+    closeSheet();
+  }
+  drawGrid();
+}
+
+function move(p) {
+  if (!D) return;
+  if (D.k === 'b') {
+    D.x2 = p.x; D.y2 = p.y;
+    const a = Math.min(D.x1, D.x2), b = Math.max(D.x1, D.x2);
+    const c = Math.min(D.y1, D.y2), d = Math.max(D.y1, D.y2);
+    S.sel = new Set(
+      cur().filter(n =>
+        n.start * GW < b && (n.start + n.dur) * GW > a &&
+        (MAX - n.pitch) * KH < d && (MAX - n.pitch + 1) * KH > c
+      ).map(n => n.id)
+    );
+  } else if (D.k === 'r') {
+    D.n.dur = Math.max(1, Math.round(p.x / GW) - D.n.start);
+    ensure(D.n.start + D.n.dur);
+    sheet(D.n);
+  } else {
+    const ns = Math.max(0, Math.floor((p.x - D.ox) / GW));
+    const np = clamp(MAX - Math.floor((p.y - D.oy) / KH), MIN, MAX);
+    const ds = ns - D.bs, dp = np - D.bp;
+    D.pos.forEach(o => {
+      o.n.start = Math.max(0, o.s + ds);
+      o.n.pitch = clamp(o.p + dp, MIN, MAX);
+      ensure(o.n.start + o.n.dur);
+    });
+    if (np !== D.lp) {
+      D.lp = np;
+      aud(D.n.pitch);
+    }
+    sheet(D.n);
+  }
+  drawGrid();
+}
+
+function up() {
+  if (D && D.k === 'b') {
+    const dist = Math.hypot(D.x2 - D.x1, D.y2 - D.y1);
+    if (dist < 6) {
+      const t = Math.floor(D.x1 / GW);
+      const p = MAX - Math.floor(D.y1 / KH);
+      if (t >= 0 && t < S.total && p >= MIN && p <= MAX) {
+        add(S.tr, t, p);
+        const n = S.notes[S.notes.length - 1];
+        S.sel = new Set([n.id]);
+        ensure(t + 4);
+        sheet(n);
+        aud(p);
+      }
+    } else if (S.sel.size) {
+      const n = S.notes.find(n => S.sel.has(n.id));
+      if (n) sheet(n);
+    }
+  }
+  D = null;
+  drawGrid();
+}
+
+const xy = e => {
+  const r = gc.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+};
+
+gc.addEventListener('pointerdown', e => {
+  gc.setPointerCapture(e.pointerId);
+  Tone.start();
+  down(xy(e), e.button === 2, e.shiftKey);
+});
+gc.addEventListener('pointermove', e => move(xy(e)));
+gc.addEventListener('pointerup', up);
+gc.addEventListener('pointercancel', up);
+gc.addEventListener('contextmenu', e => e.preventDefault());
+
+rc.addEventListener('pointerdown', e => {
+  S.start = Math.max(0, Math.round((e.clientX - rc.getBoundingClientRect().left) / GW));
+  S.tick = -1;
+  drawRuler();
+  drawGrid();
+});
+
+$('dm').onclick = () => {
+  if (S.cur) {
+    S.cur.dur = Math.max(1, S.cur.dur - 1);
+    sheet(S.cur);
+    drawGrid();
+  }
+};
+$('dp').onclick = () => {
+  if (S.cur) {
+    S.cur.dur++;
+    ensure(S.cur.start + S.cur.dur);
+    sheet(S.cur);
+    drawGrid();
+  }
+};
+$('del').onclick = () => {
+  if (S.cur) S.sel.add(S.cur.id);
+  delSel();
+};
+$('cls').onclick = closeSheet;
+
+$('copy').onclick = () => {
+  const a = cur().filter(n => S.sel.has(n.id));
+  if (!a.length) return;
+  const m = Math.min(...a.map(n => n.start));
+  S.clip = a.map(n => ({ o: n.start - m, pitch: n.pitch, dur: n.dur }));
+};
+$('paste').onclick = () => {
+  if (!S.clip.length) return;
+  S.sel.clear();
+  S.clip.forEach(c => {
+    add(S.tr, S.start + c.o, c.pitch, c.dur);
+    S.sel.add(uid);
+    ensure(S.start + c.o + c.dur);
+  });
+  drawGrid();
+};
+$('all').onclick = () => {
+  S.sel = new Set(cur().map(n => n.id));
+  drawGrid();
+};
+$('addm').onclick = () => {
+  S.total += BAR * 2;
+  resize();
+};
+
+addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  const c = e.ctrlKey || e.metaKey;
+  const k = e.key.toLowerCase();
+  if (c && k === 'c') { e.preventDefault(); $('copy').click(); }
+  else if (c && k === 'v') { e.preventDefault(); $('paste').click(); }
+  else if (c && k === 'a') { e.preventDefault(); $('all').click(); }
+  else if (k === 'delete' || k === 'backspace') { e.preventDefault(); delSel(); }
+  else if (k === ' ') { e.preventDefault(); Tone.Transport.state === 'started' ? stopAll() : play(); }
+});
+
+/* 再生 — ノートを一括スケジュールして拍を安定させる */
+Tone.Transport.bpm.value = 120;
+let playheadEventId = null;
+
+function clearTransport() {
+  Tone.Transport.cancel(0);
+  playheadEventId = null;
+  step = 0;
+}
+
+function scheduleSong() {
+  clearTransport();
+  const startTick = S.start;
+  const tickSec = Tone.Time('16n').toSeconds();
+  const endTick = Math.max(...S.notes.map(n => n.start + n.dur), startTick + 1);
+
+  // ノートを相対時間でスケジュール（Transport position 0 = startTick）
+  S.notes.forEach(n => {
+    if (n.start < startTick) return;
+    const offset = (n.start - startTick) * tickSec;
+    Tone.Transport.schedule(time => {
+      sound(n.tr, n.pitch, `0:0:${n.dur}`, time);
+    }, offset);
+  });
+
+  // プレイヘッド更新（16分音符ごと）
+  playheadEventId = Tone.Transport.scheduleRepeat(time => {
+    const elapsed = Tone.Transport.seconds;
+    const tick = startTick + Math.floor(elapsed / tickSec + 1e-9);
+    S.tick = tick;
+    Tone.Draw.schedule(() => {
+      drawGrid();
+      const w = $('wrap');
+      const px = tick * GW + 56;
+      if (px > w.scrollLeft + w.clientWidth - 40 || px < w.scrollLeft) {
+        w.scrollLeft = px - 100;
+      }
+    }, time);
+    if (tick >= endTick) {
+      Tone.Draw.schedule(() => stopAll(1), time);
+    }
+  }, '16n', 0);
+
+  // 終了時に確実に止める
+  Tone.Transport.schedule(time => {
+    Tone.Draw.schedule(() => stopAll(1), time);
+  }, (endTick - startTick) * tickSec + 0.05);
+}
+
+async function play() {
+  await Tone.start();
+  Tone.Transport.stop();
+  scheduleSong();
+  Tone.Transport.position = 0;
+  Tone.Transport.start('+0.05');
+}
+
+function stopAll(natural) {
+  Tone.Transport.stop();
+  clearTransport();
+  TR.forEach(t => t.inst && t.inst.stop());
+  S.tick = -1;
+  drawGrid();
+  if (rec) {
+    const r = rec;
+    rec = null;
+    setTimeout(async () => {
+      try {
+        const b = await r.stop();
+        master.disconnect(r);
+        dl(b, 'music.' + (b.type.includes('ogg') ? 'ogg' : 'webm'));
+      } catch (_) {}
+    }, 1500);
+  }
+}
+
+function dl(b, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = name;
+  a.click();
+}
+
+$('play').onclick = play;
+$('stop').onclick = () => stopAll();
+$('exp').onclick = async () => {
+  await Tone.start();
+  rec = new Tone.Recorder();
+  master.connect(rec);
+  rec.start();
+  S.start = 0;
+  play();
+};
+
+/* サイドバーイベント */
+(function populateIns() {
+  const sel = $('ins');
+  sel.innerHTML = '';
+  const g1 = document.createElement('optgroup');
+  g1.label = 'メロディック楽器';
+  Object.keys(INS).forEach(k => g1.appendChild(new Option(k, k)));
+  sel.appendChild(g1);
+  const g2 = document.createElement('optgroup');
+  g2.label = '打楽器';
+  g2.appendChild(new Option('ドラムキット', 'ドラムキット'));
+  sel.appendChild(g2);
+})();
+
+$('ins').onchange = e => {
+  setIns(S.tr, e.target.value);
+  aud(TR[S.tr].isDrum ? 48 : 72);
+};
+
+$('vol').oninput = e => {
+  TR[S.tr].v.volume.value = +e.target.value;
+  $('volv').textContent = e.target.value + ' dB';
+};
+
+$('mute').onclick = () => {
+  const v = TR[S.tr].v;
+  v.mute = !v.mute;
+  updateTrackUI();
+  renderTrackList();
+};
+
+$('tname').onchange = e => {
+  const name = e.target.value.trim() || `トラック ${S.tr + 1}`;
+  TR[S.tr].n = name;
+  renderTrackList();
+};
+$('tname').onkeydown = e => {
+  if (e.key === 'Enter') e.target.blur();
+};
+
+$('addTrack').onclick = () => {
+  const t = createTrack(`トラック ${TR.length + 1}`, 'ピアノ');
+  selTrack(TR.length - 1);
+  renderTrackList();
+};
+
+$('delTrack').onclick = () => {
+  if (TR.length <= 1) return;
+  const idx = S.tr;
+  const t = TR[idx];
+  const hasNotes = S.notes.some(n => n.tr === idx);
+  if (hasNotes && !confirm(`「${t.n}」にはノートがあります。削除しますか？`)) return;
+  // ノート削除 & インデックス補正
+  S.notes = S.notes.filter(n => n.tr !== idx).map(n => {
+    if (n.tr > idx) n.tr--;
+    return n;
+  });
+  disposeTrack(t);
+  TR.splice(idx, 1);
+  S.sel.clear();
+  closeSheet();
+  selTrack(Math.min(idx, TR.length - 1));
+  renderTrackList();
+  drawGrid();
+};
+
+const tgl = () => {
+  $('sb').classList.toggle('-translate-x-full');
+  $('ov').classList.toggle('hidden');
+};
+$('tg').onclick = tgl;
+$('ov').onclick = tgl;
+
+function setBpm(v) {
+  v = clamp(+v || 120, 40, 240);
+  Tone.Transport.bpm.value = v;
+  $('hbpm').value = v;
+  $('bpm').value = v;
+  $('bpmv').textContent = v;
+}
+$('hbpm').onchange = e => setBpm(e.target.value);
+$('bpm').oninput = e => setBpm(e.target.value);
+$('rv').oninput = e => {
+  rev.wet.value = +e.target.value;
+  $('rvv').textContent = Math.round(e.target.value * 100) + '%';
+};
+$('mv').oninput = e => {
+  master.gain.value = +e.target.value;
+  $('mvv').textContent = Math.round(e.target.value * 100) + '%';
+};
+
+/* 保存・読み込み */
+$('save').onclick = () => {
+  const data = {
+    version: 2,
+    bpm: Tone.Transport.bpm.value,
+    total: S.total,
+    notes: S.notes,
+    tracks: TR.map(t => ({
+      n: t.n,
+      ins: t.ins,
+      isDrum: t.isDrum,
+      vol: t.v.volume.value,
+      mute: t.v.mute,
+    })),
+  };
+  dl(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'music-project.json');
+};
+
+$('open').onclick = () => $('file').click();
+$('file').onchange = async e => {
+  try {
+    const d = JSON.parse(await e.target.files[0].text());
+    // 既存トラック破棄
+    TR.forEach(disposeTrack);
+    TR.length = 0;
+    trackIdCounter = 0;
+
+    if (d.tracks && Array.isArray(d.tracks)) {
+      // v2 format
+      d.tracks.forEach(tr => {
+        createTrack(tr.n, tr.ins, !!tr.isDrum);
+        const t = TR[TR.length - 1];
+        t.v.volume.value = tr.vol ?? -6;
+        t.v.mute = !!tr.mute;
+        if (!t.isDrum && INS[tr.ins]) {
+          if (t.inst) { t.inst.dispose(); }
+          t.inst = makeIns(tr.ins, t.v);
+        }
+      });
+    } else if (d.tr && Array.isArray(d.tr)) {
+      // 旧形式互換
+      d.tr.forEach((tr, i) => {
+        const isDrum = i === 2 || tr.ins === 'ドラムキット' || !tr.ins;
+        createTrack(['メロディ', 'ベース', 'ドラム'][i] || `トラック ${i + 1}`, tr.ins || 'ピアノ', isDrum);
+        const t = TR[TR.length - 1];
+        t.v.volume.value = tr.vol ?? -6;
+        if (!t.isDrum && INS[tr.ins]) {
+          if (t.inst) t.inst.dispose();
+          t.inst = makeIns(tr.ins, t.v);
+        }
+      });
+    } else {
+      createTrack('メロディ', 'ピアノ');
+      createTrack('ベース', 'ベース');
+      createTrack('ドラム', 'ドラムキット', true);
+    }
+
+    S.notes = (d.notes || []).map(n => ({ ...n }));
+    S.total = d.total || 64;
+    uid = Math.max(0, ...S.notes.map(n => n.id), 0);
+    setBpm(d.bpm || 120);
+    S.sel.clear();
+    closeSheet();
+    resize();
+    selTrack(0);
+    renderTrackList();
+  } catch (_) {
+    alert('読み込めませんでした');
+  }
+  e.target.value = '';
+};
+
+/* 初期化 */
+resize();
+selTrack(0);
+renderTrackList();
+</script>
+</body>
+</html>
