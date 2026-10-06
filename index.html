@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>a2giriのサイト</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- iframeを表示する場所 -->
+  <iframe id="mainFrame" src=""></iframe>
+
+  <script>
+    // ===== ここを編集してください =====
+    // パラメータの値 → iframeのURL の対応表
+    const iframeMap = {
+      "atsuri-app": "https://a2giri.f5.si/atsuri-app.html",
+      "atsuri": "https://a2giri.f5.si/atsuri.html",
+      "atube": "https://a2giri.f5.si/atube.html",
+      "pop": "https://a2giri.f5.si/awa.html",
+      "htmlt": "https://a2giri.f5.si/htmlt.html",
+      "onigiri": "https://a2giri.f5.si/onigiri.html",
+      "slas": "https://a2giri.f5.si/slide.html",
+      "tabs15": "https://a2giri.f5.si/tabs15.html",
+      "uiui": "https://a2giri.f5.si/uiui.html",
+      "vasizer": "https://a2giri.f5.si/vasizer.html",
+      "word": "https://a2giri.f5.si/word.html",
+      "armbrowser": "https://a2giri.f5.si/arm.html",
+      "t-app": "https://a2giri.f5.si/t-app.html",
+      "files": "https://a2giri.f5.si/files.html",
+      "vasic": "https://a2giri.f5.si/vasic.html",
+      // 好きなだけ追加できます
+    };
+
+    // どれにも当てはまらないときのデフォルトiframe
+    const defaultIframe = "https://a2giri.f5.si/homepage.html";
+    // =================================
+
+    // URLパラメータを取得（?太郎 のような形式に対応）
+    const params = new URLSearchParams(window.location.search);
+    const key = params.keys().next().value; // ?の後ろの文字列を取得
+
+    // 対応するiframeを決定
+    const targetUrl = (key && iframeMap[key]) ? iframeMap[key] : defaultIframe;
+
+    // iframeにセット
+    document.getElementById("mainFrame").src = targetUrl;
+  </script>
+
+</body>
+</html>
